@@ -32,7 +32,7 @@ struct SourceEditor: NSViewRepresentable {
         context.coordinator.updating = true
         editor.string = buffer.text; editor.setSelectedRange(buffer.selection)
         context.coordinator.updating = false
-        configure(editor); editor.highlight(NSRange(location: 0, length: (editor.string as NSString).length))
+        configure(editor); editor.highlight(NSRange(location: 0, length: (editor.string as NSString).length)); editor.rebuildLines()
         DispatchQueue.main.async { editor.window?.makeFirstResponder(editor) }
         return scroll
     }
