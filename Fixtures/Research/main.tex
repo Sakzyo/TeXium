@@ -1,0 +1,58 @@
+\documentclass[11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,graphicx}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\title{A Small Atlas of Ideas}
+\author{TeXium Sample Project}
+\date{September 2026}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+A working example of a local research document: chapters, mathematics,
+figures, tables, cross references, and a bibliography. All of its source
+files remain ordinary files on your Mac.
+\end{abstract}
+\tableofcontents
+
+\section{Introduction}
+Good writing begins with a question. This project brings the tools of
+scientific typesetting into a quiet, native workspace. The source remains
+readable and portable, following the tradition of Knuth~\cite{knuth1984}.
+
+\input{chapters/methods}
+
+\section{Results and Discussion}
+Equation~\eqref{eq:euler} connects five fundamental constants.
+Figure~\ref{fig:study} and Table~\ref{tab:observations} illustrate the
+project's resource and table workflows.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.48\linewidth]{figures/study.png}
+  \caption{An original geometric illustration included as a local asset.}
+  \label{fig:study}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering
+  \begin{tabular}{lrr}
+    \hline
+    Stage & Observations & Iterations \\
+    \hline
+    Explore & 12 & 3 \\
+    Refine & 24 & 5 \\
+    Explain & 36 & 8 \\
+    \hline
+  \end{tabular}
+  \caption{Illustrative values for a sample document, not measured data.}
+  \label{tab:observations}
+\end{table}
+
+\section{Conclusion}
+Keep the source close, the ideas clear, and the tools out of the way.
+
+\bibliographystyle{plain}
+\bibliography{references}
+\end{document}
