@@ -9,6 +9,7 @@ struct SourceEditor: NSViewRepresentable {
     @AppStorage("editorSize") private var size = 14.0
     @AppStorage("lineNumbers") private var numbers = true
     @AppStorage("highlighting") private var highlighting = true
+    @AppStorage(SyntaxPalette.defaultsKey) private var savedColors = Data()
     @AppStorage("spellCheck") private var spelling = false
     func makeCoordinator() -> Coordinator { Coordinator(session: session, buffer: buffer) }
     func makeNSView(context: Context) -> NSScrollView {
@@ -64,6 +65,7 @@ struct SourceEditor: NSViewRepresentable {
         editor.isEditable = !session.operationBusy
         let chosen = NSFont(name: font, size: size) ?? .monospacedSystemFont(ofSize: size, weight: .regular)
         if editor.font != chosen { editor.font = chosen; editor.highlight(NSRange(location: 0, length: (editor.string as NSString).length)) }
+        editor.syntaxPalette = SyntaxPalette(data: savedColors)
         editor.highlightEnabled = highlighting; editor.isContinuousSpellCheckingEnabled = spelling
     }
     @MainActor final class Coordinator: NSObject, NSTextViewDelegate {
@@ -101,26 +103,13 @@ struct SourceEditor: NSViewRepresentable {
     var highlightEnabled = true {
         didSet { if oldValue != highlightEnabled { highlight(NSRange(location: 0, length: (string as NSString).length)) } }
     }
+    var syntaxPalette = SyntaxPalette() {
+        didSet { if oldValue != syntaxPalette { highlight(NSRange(location: 0, length: (string as NSString).length)) } }
+    }
     var lineStarts: [Int] = [0]
-    private static let patterns: [(NSRegularExpression, NSColor)] = ([
-        (#"\\[a-zA-Z@]+\*?"#, .systemPurple),
-        (#"[{}\[\]]"#, .secondaryLabelColor),
-        (#"\$\$?|\\[\(\)\[\]]"#, .systemPink),
-        (#"\\(?:label|(?:auto|eq|page)?ref|[a-zA-Z]*cite[a-zA-Z]*)\*?(?:\[[^\]]*\])*\{[^}]*\}"#, .systemTeal),
-        (#"\\(?:part|chapter|section|subsection|subsubsection|paragraph)\*?\{[^}]*\}"#, .systemBlue),
-        (#"(?m)(?<!\\)(?:\\\\)*%[^\r\n]*"#, .secondaryLabelColor),
-        (#"@[a-zA-Z]+\s*\{[^,]*"#, .systemPurple)
-    ] as [(String, NSColor)]).map { (try! NSRegularExpression(pattern: $0.0), $0.1) }
     func highlight(_ input: NSRange) {
-        guard let storage = textStorage, storage.length > 0 else { return }
-        let range = NSIntersectionRange(input, NSRange(location: 0, length: storage.length))
-        storage.beginEditing(); storage.addAttribute(.foregroundColor, value: NSColor.textColor, range: range)
-        if highlightEnabled {
-            for (pattern, color) in Self.patterns {
-                for match in pattern.matches(in: string, range: range) { storage.addAttribute(.foregroundColor, value: color, range: match.range) }
-            }
-        }
-        storage.endEditing()
+        guard let storage = textStorage else { return }
+        LaTeXSyntaxHighlighter.apply(to: storage, range: input, palette: syntaxPalette, enabled: highlightEnabled)
     }
     func rebuildLines() {
         lineStarts = [0]

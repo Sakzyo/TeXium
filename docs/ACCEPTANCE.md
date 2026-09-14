@@ -6,10 +6,11 @@ Validation date: 2026-09-14. Host: Apple silicon, macOS 26.5.2, Xcode 26.6, Swif
 
 | Check | Result |
 | --- | --- |
-| Swift package suite | 41 tests, zero failures, zero skips on this host |
-| Offline suite | The same 41 tests passed with network access denied to the runner and descendants |
+| Swift package service baseline | 41 tests, zero failures, zero skips before the syntax-color feature |
+| Offline service baseline | The same 41 tests passed with network access denied to the runner and descendants |
+| Syntax palette and highlighter | Five focused tests passed with zero failures |
 | Native Xcode Debug application | Built and launched |
-| Xcode Release UI tests | Three tests passed together: compiled-project restoration, authoring workflow, and uncompiled workspace layout |
+| Xcode Release UI baseline | Three tests passed together before the syntax-color feature: compiled-project restoration, authoring workflow, and uncompiled workspace layout |
 | Release startup/restoration | Existing saved window state remained running through the extended 10-second launch check; no matching layout-constraint errors |
 | Release application | Builds for arm64 and x86_64 |
 | Clean Release ZIP | Extracted into a fresh temporary directory; `codesign --verify --deep --strict` passed |
@@ -57,6 +58,14 @@ The separate verification app exercised **Project → GitHub Synchronization**, 
 No real GitHub repository was pushed or changed during verification. Authenticated HTTPS/SSH operations against GitHub, expired/organization-restricted tokens, and Developer ID Keychain behavior across app updates still require account-based release qualification. The Keychain test requires a logged-in macOS session with Keychain access; a restricted tool sandbox returned a Keychain parameter error, while the normal macOS process passed save/update/read/removal. The final offline suite ran with normal filesystem/Keychain access and network access denied.
 
 The universal Release ZIP was rebuilt with the feature, extracted outside the Documents file provider, and passed strict signature verification. The Release executable's credential-helper mode exited without opening SwiftUI or returning a credential for an unrelated host.
+
+## Syntax color customization verification
+
+In the separate verification app, **Settings → Syntax Colors** changed commands to orange and comments to green using hex fields. The open editor recolored immediately while its source remained unchanged and saved. Both colors persisted after a normal quit and relaunch. Individual reset retained the other custom color, and Restore Default Colors cleared all overrides. The final build also verified that resetting while a hex field is focused refreshes the field to match the default color. [Settings](screenshots/syntax-colors.jpg) and [live editor colors](screenshots/syntax-custom-editor.jpg).
+
+`./script/test.sh --filter SyntaxHighlightingTests` passed five tests covering hex validation, UserDefaults persistence, individual resets, malformed preference recovery, all seven text categories, comment precedence, incremental recoloring, disabling highlighting, and preservation of source text and unrelated attributes. The final native Debug test build and universal Release build succeeded; Release remained running through its ten-second startup check. The final Release ZIP passed strict signature verification after extraction to a fresh temporary directory.
+
+The GUI automation runner could not reliably activate Settings for a native color-panel interaction probe, so native panel selection is not recorded as an automated pass. The hex-field workflow and resets were verified through the application's native interface. The existing three-test workspace UI result above remains a baseline from before this feature.
 
 ## Required before public release
 

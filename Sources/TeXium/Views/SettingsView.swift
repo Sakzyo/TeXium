@@ -39,6 +39,7 @@ struct SettingsView: View {
                 Toggle("LaTeX completion", isOn: $completion)
                 Toggle("Check spelling", isOn: $spelling)
             }.tabItem { Label("Editor", systemImage: "text.cursor") }
+            SyntaxColorSettings().tabItem { Label("Syntax Colors", systemImage: "paintpalette") }
             Form {
                 TextField("TeX binary folder", text: $texPath, prompt: Text("Automatic: /Library/TeX/texbin"))
                 Picker("Default engine", selection: $engine) { ForEach(TeXEngine.allCases) { Text($0.title).tag($0.rawValue) } }

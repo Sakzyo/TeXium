@@ -7,7 +7,7 @@ A native macOS workspace for writing, typesetting, and exploring LaTeX. Projects
 ## What works
 
 - Multiple project windows, recent projects, pinned projects, native file navigation, tabs, and Settings.
-- An AppKit text editor with incremental LaTeX coloring, line numbers, native undo/find, brace and environment matching, indentation, completion, and outline navigation.
+- An AppKit text editor with customizable incremental LaTeX coloring, line numbers, native undo/find, brace and environment matching, indentation, completion, and outline navigation.
 - Local `latexmk` builds with pdfLaTeX, XeLaTeX, LuaLaTeX, or LaTeX → PDF; debounced automatic builds, cancellation, structured diagnostics, and complete logs.
 - PDFKit preview, thumbnails, search, zoom, printing, export, and bidirectional SyncTeX. Failed builds preserve the last successful PDF.
 - BibTeX browsing and citation completion; equation, table, figure, and symbol assistants; local notes and `texcount` word counts.
@@ -16,6 +16,8 @@ A native macOS workspace for writing, typesetting, and exploring LaTeX. Projects
 - Atomic coordinated saves, external-change comparison, crash recovery copies, UTF-8/UTF-16 BOM handling, and LF/CRLF preservation.
 
 The implementation contains no browser view, application server, account system, or collaboration infrastructure. Optional Git network actions use installed Git with SSH, existing credential helpers, or a token stored in Keychain through Settings → GitHub.
+
+Use **Settings → Syntax Colors** to choose colors with native color pickers or six-digit hex values for commands, brackets, math delimiters, labels/citations, headings, comments, and BibTeX entries. Open editors update immediately, and preferences apply across projects and app launches. Reset individual colors or restore all defaults. [Settings preview](docs/screenshots/syntax-colors.jpg).
 
 ## Requirements
 
@@ -84,7 +86,7 @@ See [validation results and remaining acceptance work](docs/ACCEPTANCE.md).
 
 ## Storage and architecture
 
-`Sources/TeXium` owns scenes, menus, per-window stores, and native views. `Sources/TeXiumCore` owns portable models, parsers, and filesystem/process services. SwiftUI manages the desktop interface; focused AppKit bridges supply TextKit editing, PDFKit, window lifecycle, file panels, and FSEvents.
+`Sources/TeXium` owns scenes, menus, per-window stores, and native views. `Sources/TeXiumCore` owns shared models, parsers, syntax styling, and filesystem/process services. SwiftUI manages the desktop interface; focused AppKit bridges supply TextKit editing, PDFKit, window lifecycle, file panels, and FSEvents.
 
 Project configuration, recovery, notes, and history live under `~/Library/Application Support/TeXium/Projects/<path-hash>/`. Preferences and recents use UserDefaults. Generated TeX output is isolated in each project's `.texium-build/`; `preview/` retains the last successful PDF and SyncTeX. Source files remain canonical.
 
