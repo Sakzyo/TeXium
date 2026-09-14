@@ -25,7 +25,7 @@ export CLANG_MODULE_CACHE_PATH="$ROOT_DIR/.build/ModuleCache"
 export SWIFTPM_MODULECACHE_OVERRIDE="$ROOT_DIR/.build/ModuleCache"
 SIGNING_ARGS=("CODE_SIGN_IDENTITY=${TEXIUM_SIGNING_IDENTITY:--}" "CODE_SIGN_STYLE=Manual")
 if [[ -n "${TEXIUM_DEVELOPMENT_TEAM:-}" ]]; then SIGNING_ARGS+=("DEVELOPMENT_TEAM=$TEXIUM_DEVELOPMENT_TEAM"); fi
-xcodebuild -project TeXium.xcodeproj -scheme TeXium -configuration "${CONFIGURATION:-Debug}" -destination 'platform=macOS' -derivedDataPath "$BUILD_DIR" -clonedSourcePackagesDirPath "$ROOT_DIR/.build/SourcePackages" build "${SIGNING_ARGS[@]}"
+xcodebuild -project TeXium.xcodeproj -scheme TeXium -configuration "${CONFIGURATION:-Debug}" -destination 'platform=macOS' -derivedDataPath "$BUILD_DIR" -clonedSourcePackagesDirPath "$ROOT_DIR/.build/SourcePackages" -packageCachePath "$ROOT_DIR/.build/SwiftPMCache" build "${SIGNING_ARGS[@]}"
 STAGING_DIR="$(mktemp -d "$BUILD_DIR/package.XXXXXX")"
 trap 'rm -rf "$STAGING_DIR"' EXIT
 /usr/bin/ditto --norsrc --noextattr "$BUILD_DIR/Build/Products/${CONFIGURATION:-Debug}/$APP_NAME.app" "$STAGING_DIR/$APP_NAME.app"
@@ -39,7 +39,10 @@ mv "$STAGING_DIR/$APP_NAME.app" "$APP_BUNDLE"
 # File-provider metadata on Documents folders is not part of an app bundle.
 /usr/bin/xattr -dr com.apple.FinderInfo "$APP_BUNDLE" 2>/dev/null || true
 /usr/bin/xattr -dr com.apple.ResourceFork "$APP_BUNDLE" 2>/dev/null || true
-/usr/bin/codesign --verify --deep --strict "$APP_BUNDLE"
+# Document providers can reattach Finder metadata immediately after a copy.
+# Verify the delivered bytes through a clean local staging copy instead.
+/usr/bin/ditto --norsrc --noextattr "$APP_BUNDLE" "$STAGING_DIR/Verified.app"
+/usr/bin/codesign --verify --deep --strict "$STAGING_DIR/Verified.app"
 case "$MODE" in
     --build-only|build-only) echo "Built $APP_BUNDLE" ;;
     --debug|debug) lldb -- "$APP_BUNDLE/Contents/MacOS/$APP_NAME" ;;

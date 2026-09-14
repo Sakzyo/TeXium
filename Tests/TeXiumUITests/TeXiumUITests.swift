@@ -1,6 +1,30 @@
 import XCTest
 
 final class TeXiumUITests: XCTestCase {
+    @MainActor func testEmptyInspectorViewsStayAtTop() throws {
+        continueAfterFailure = false
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("TeXium-Inspector-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try "\\documentclass{article}\n".write(to: root.appendingPathComponent("main.tex"), atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let app = XCUIApplication()
+        app.launchArguments = ["--project", root.path, "-ApplePersistenceIgnoreState", "YES"]
+        app.launch(); defer { app.terminate() }
+        let picker = app.popUpButtons["project-inspector-picker"].firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 15))
+
+        for (tab, title) in [("Outline", "No Sections Yet"), ("Problems", "No Compilation Issues"),
+                             ("References", "No References"), ("History", "No Snapshots Yet"),
+                             ("Notes", "No Personal Notes")] {
+            picker.click()
+            app.menuItems[tab].firstMatch.click()
+            let heading = app.staticTexts[title].firstMatch
+            XCTAssertTrue(heading.waitForExistence(timeout: 5), "Missing \(tab) empty state")
+            XCTAssertLessThan(heading.frame.minY - picker.frame.maxY, 130, "\(tab) has excess top spacing")
+        }
+    }
+
     @MainActor func testEnvironmentTemplateWorkflow() throws {
         continueAfterFailure = false
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("TeXium-Templates-" + UUID().uuidString)

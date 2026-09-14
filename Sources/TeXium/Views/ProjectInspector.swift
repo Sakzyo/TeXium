@@ -30,10 +30,26 @@ struct ProjectInspector: View {
         }
     }
 }
+
+struct InspectorEmptyState: View {
+    let title: String
+    let symbol: String
+    let message: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: symbol).font(.headline)
+            Text(message).font(.callout).foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
 struct OutlineInspector: View {
     let session: ProjectSession
     var body: some View {
-        if session.outline.isEmpty { ContentUnavailableView("No Sections Yet", systemImage: "list.bullet.indent", description: Text("Add sections or chapters to navigate your document here.")) }
+        if session.outline.isEmpty { InspectorEmptyState(title: "No Sections Yet", symbol: "list.bullet.indent", message: "Add sections or chapters to navigate your document here.") }
         else {
             List {
                 ForEach(Array(Set(session.outline.map(\.file))).sorted(), id: \.self) { file in
@@ -56,7 +72,7 @@ struct ProblemsInspector: View {
     var body: some View {
         VStack(spacing: 0) {
             Picker("Severity", selection: $filter) { Text("All").tag("All"); Text("Errors").tag("Errors"); Text("Warnings").tag("Warnings") }.pickerStyle(.segmented).padding(10)
-            if diagnostics.isEmpty { ContentUnavailableView("No Compilation Issues", systemImage: "checkmark.circle", description: Text(session.building ? "Typesetting is in progress." : "Diagnostics from your local compiler appear here.")) }
+            if diagnostics.isEmpty { InspectorEmptyState(title: "No Compilation Issues", symbol: "checkmark.circle", message: session.building ? "Typesetting is in progress." : "Diagnostics from your local compiler appear here.") }
             else {
                 List {
                     ForEach(Array(Set(diagnostics.map { $0.file ?? "Build" })).sorted(), id: \.self) { file in
@@ -90,7 +106,7 @@ struct ReferencesInspector: View {
     var body: some View {
         VStack(spacing: 0) {
             TextField("Search references", text: $query).textFieldStyle(.roundedBorder).padding(10)
-            if session.references.isEmpty { ContentUnavailableView("No References", systemImage: "books.vertical", description: Text("Import a .bib file or paste BibTeX entries to get started.")) }
+            if session.references.isEmpty { InspectorEmptyState(title: "No References", symbol: "books.vertical", message: "Import a .bib file or paste BibTeX entries to get started.") }
             else {
                 List(selection: $selected) {
                     ForEach(session.references.filter { query.isEmpty || $0.searchText.localizedCaseInsensitiveContains(query) }) { entry in
@@ -120,24 +136,29 @@ struct ReferencesInspector: View {
 struct NotesInspector: View {
     @Bindable var session: ProjectSession
     @State private var showResolved = false
+    private var visibleNotes: [UserNote] { session.notes.filter { showResolved || !$0.resolved } }
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             Toggle("Show resolved notes", isOn: $showResolved).font(.caption).padding(10)
-            List {
-                ForEach(session.notes.filter { showResolved || !$0.resolved }) { note in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(note.text).textSelection(.enabled).strikethrough(note.resolved)
-                        if let file = note.file { Button("\(file):\(note.line ?? 1)") { Task { await session.select(file, line: note.line) } }.font(.caption).buttonStyle(.link) }
-                        HStack {
-                            Text(note.created, style: .date).font(.caption).foregroundStyle(.secondary)
-                            Spacer()
-                            Button(note.resolved ? "Reopen" : "Resolve") {
-                                if let index = session.notes.firstIndex(where: { $0.id == note.id }) { session.notes[index].resolved.toggle(); session.persistPreferences() }
-                            }.font(.caption)
-                        }
-                    }.padding(.vertical, 4)
-                }
-            }.listStyle(.inset)
+            if visibleNotes.isEmpty {
+                InspectorEmptyState(title: "No Personal Notes", symbol: "note.text", message: "Add a note about this project to see it here.")
+            } else {
+                List {
+                    ForEach(visibleNotes) { note in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(note.text).textSelection(.enabled).strikethrough(note.resolved)
+                            if let file = note.file { Button("\(file):\(note.line ?? 1)") { Task { await session.select(file, line: note.line) } }.font(.caption).buttonStyle(.link) }
+                            HStack {
+                                Text(note.created, style: .date).font(.caption).foregroundStyle(.secondary)
+                                Spacer()
+                                Button(note.resolved ? "Reopen" : "Resolve") {
+                                    if let index = session.notes.firstIndex(where: { $0.id == note.id }) { session.notes[index].resolved.toggle(); session.persistPreferences() }
+                                }.font(.caption)
+                            }
+                        }.padding(.vertical, 4)
+                    }
+                }.listStyle(.inset)
+            }
             Button("Add Personal Note…", systemImage: "note.text.badge.plus") { session.sheet = .note }.padding(10)
         }
     }

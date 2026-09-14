@@ -50,7 +50,7 @@ for configuration in ["Debug", "Release"]:
         GENERATE_INFOPLIST_FILE = NO; CODE_SIGN_STYLE = Manual; CODE_SIGN_IDENTITY = "-";
         ENABLE_HARDENED_RUNTIME = YES; ENABLE_APP_SANDBOX = NO;
         COMBINE_HIDPI_IMAGES = YES; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks");
-        CURRENT_PROJECT_VERSION = 1; MARKETING_VERSION = 0.1.0;
+        CURRENT_PROJECT_VERSION = 1; MARKETING_VERSION = 1.0.0;
     }};'''))
 project_config = put("project-configs", f"isa = XCConfigurationList; buildConfigurations = {refs(project_configs)}; defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;")
 target_config = put("target-configs", f"isa = XCConfigurationList; buildConfigurations = {refs(target_configs)}; defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;")

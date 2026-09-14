@@ -4,12 +4,18 @@
 
 ```sh
 CONFIGURATION=Release ./script/build_and_run.sh --build-only
-file dist/TeXium.app/Contents/MacOS/TeXium
-codesign --verify --deep --strict --verbose=2 dist/TeXium.app
-codesign -d --entitlements :- dist/TeXium.app
+VERIFY_DIR=$(mktemp -d)
+ditto --norsrc --noextattr dist/TeXium.app "$VERIFY_DIR/TeXium.app"
+file "$VERIFY_DIR/TeXium.app/Contents/MacOS/TeXium"
+codesign --verify --deep --strict --verbose=2 "$VERIFY_DIR/TeXium.app"
+codesign -d --entitlements :- "$VERIFY_DIR/TeXium.app"
+./script/package_dmg.sh
+hdiutil verify dist/TeXium-1.0.0.dmg
 ```
 
 Release enables optimization and builds arm64/x86_64. The default signature is ad-hoc (`-`), suitable for local development, not Gatekeeper distribution. Debug bundles can include Xcode preview/debug dylibs; distribute the Release bundle. TeX, Git credentials, manuscript data, and sample build caches are not bundled.
+
+`package_dmg.sh` checks the app version and signature, then creates a DMG containing `TeXium.app` and an Applications shortcut. It preserves the signature on the input app; it does not sign or notarize the result. Use a Developer ID signed, notarized, and stapled Release app for a public DMG.
 
 ## Developer ID
 

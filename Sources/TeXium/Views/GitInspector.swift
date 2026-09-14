@@ -39,12 +39,14 @@ struct GitInspector: View {
                         Button("Show Operation Log…") { detail = session.gitLog; showDetail = true }
                     }
                 }.font(.callout).padding(12)
-            }.frame(maxHeight: session.isGitRepository ? 340 : .infinity)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxHeight: 340)
             if let state = session.gitState {
                 Divider()
                 HStack { Text("Changes · \(state.files.count)"); Spacer(); Text("\(state.staged.count) staged").foregroundStyle(.secondary) }.font(.caption).padding(12)
                 if state.files.isEmpty {
-                    ContentUnavailableView("Working Tree Clean", systemImage: "checkmark.circle", description: Text("Saved changes will appear here."))
+                    InspectorEmptyState(title: "Working Tree Clean", symbol: "checkmark.circle", message: "Saved changes will appear here.")
                 } else {
                     List(state.files) { file in
                         HStack(alignment: .top) {
@@ -71,6 +73,8 @@ struct GitInspector: View {
                     HStack { TextField("Existing local branch", text: $branch); Button("Switch") { session.switchGitBranch(branch) }.disabled(branch.isEmpty) }
                     Text("Sync uses committed files. Pulls only fast-forward; conflicts and diverged history require resolution in your Git client.").font(.caption).foregroundStyle(.secondary)
                 }.padding(12).disabled(busy)
+            } else {
+                Spacer(minLength: 0)
             }
         }
         .task { await session.refreshGit() }
