@@ -7,6 +7,7 @@ import TeXiumCore
     private let heading = NSTextField(labelWithString: "")
     private let scroll = NSScrollView()
     private var items: [CompletionItem] = []
+    private var kind: CompletionKind = .command
     var onChoose: ((Int) -> Void)?
     var onDismiss: (() -> Void)?
     var isVisible: Bool { panel.isVisible }
@@ -43,7 +44,7 @@ import TeXiumCore
     func show(_ result: CompletionResult, for editor: NSTextView) {
         guard let parent = editor.window, let screen = parent.screen else { return }
         let old = items.indices.contains(table.selectedRow) ? items[table.selectedRow].insertion : nil
-        items = result.items; heading.stringValue = result.kind.title + " · \(items.count)"
+        items = result.items; kind = result.kind; heading.stringValue = result.kind.title + " · \(items.count)"
         table.reloadData()
         let selected = old.flatMap { value in items.firstIndex { $0.insertion == value } } ?? 0
         table.selectRowIndexes(IndexSet(integer: selected), byExtendingSelection: false); table.scrollRowToVisible(selected)
@@ -86,7 +87,7 @@ import TeXiumCore
         let cell = NSTableCellView()
         let title = NSTextField(labelWithString: item.title)
         title.font = .monospacedSystemFont(ofSize: 12, weight: .medium)
-        title.lineBreakMode = .byTruncatingTail; title.setAccessibilityIdentifier("completion-" + item.insertion)
+        title.lineBreakMode = .byTruncatingTail; title.setAccessibilityIdentifier("completion-" + (kind == .environment ? item.title : item.insertion))
         let detail = NSTextField(labelWithString: item.detail.replacingOccurrences(of: "\n", with: " "))
         detail.font = .systemFont(ofSize: 10.5); detail.textColor = .secondaryLabelColor; detail.lineBreakMode = .byTruncatingTail
         cell.textField = title; cell.toolTip = item.title + "\n" + item.detail

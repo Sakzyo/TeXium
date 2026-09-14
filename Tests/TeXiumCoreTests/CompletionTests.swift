@@ -96,7 +96,7 @@ final class CompletionTests: XCTestCase {
         XCTAssertNil(LaTeXCompletion.suggestions(in: #"\fake"#, at: 5, file: "main.tex", project: project, liveBuffers: live))
     }
     func testEnvironmentAndFileCompletionArePreserved() throws {
-        XCTAssertEqual(try request(#"\begin{equa|}"#).items.map(\.insertion), ["equation", "equation*"])
+        XCTAssertEqual(try request(#"\begin{equa|}"#).items.map(\.title), ["equation", "equation*"])
         let files = ["chapters/intro.tex", "figures/chart.pdf", "refs.bib", "notes.txt"]
         XCTAssertEqual(try request(#"\includegraphics[width=\linewidth]{chart|}"#, files: files).items.first?.insertion, "figures/chart.pdf")
         XCTAssertEqual(try request(#"\include{intro|}"#, files: files).items.first?.insertion, "chapters/intro")

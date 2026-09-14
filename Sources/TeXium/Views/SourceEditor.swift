@@ -182,7 +182,7 @@ struct SourceEditor: NSViewRepresentable {
             setSelectedRange(NSRange(location: range.location + (prefix as NSString).length, length: 0))
         } else { insertText(newline + indent, replacementRange: range) }
     }
-    private var indentation: String {
+    var indentation: String {
         let width = max(1, UserDefaults.standard.integer(forKey: "tabWidth") == 0 ? 4 : UserDefaults.standard.integer(forKey: "tabWidth"))
         return UserDefaults.standard.object(forKey: "useSpaces") as? Bool ?? true ? String(repeating: " ", count: width) : "\t"
     }

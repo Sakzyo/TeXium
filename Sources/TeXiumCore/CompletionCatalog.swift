@@ -1,7 +1,7 @@
 import Foundation
 
 enum CompletionCatalog {
-    static let environments = ["document", "equation", "equation*", "align", "align*", "aligned", "gather", "gather*", "matrix", "pmatrix", "bmatrix", "cases", "itemize", "enumerate", "description", "figure", "figure*", "table", "table*", "tabular", "tabularx", "abstract", "center", "verbatim", "frame", "theorem", "lemma", "proof", "quote", "quotation", "minipage"]
+    static let environments = ["document", "equation", "equation*", "align", "align*", "aligned", "gather", "gather*", "multline", "multline*", "split", "array", "matrix", "pmatrix", "bmatrix", "Bmatrix", "vmatrix", "Vmatrix", "cases", "itemize", "enumerate", "description", "figure", "figure*", "table", "table*", "tabular", "tabularx", "abstract", "center", "verbatim", "frame", "theorem", "lemma", "proof", "quote", "quotation", "minipage"]
     static let commands: [CompletionItem] = {
         var result: [CompletionItem] = []
         func add(_ names: [String], _ arguments: [String], _ detail: String) {
@@ -14,10 +14,13 @@ enum CompletionCatalog {
         add(["label"], ["key"], "Define a cross-reference label")
         add(["textbf", "textit", "texttt", "textsf", "textrm", "textsc", "emph", "underline", "mbox"], ["text"], "Text formatting")
         add(["caption", "footnote", "title", "author", "date", "thanks"], ["text"], "Document text")
-        add(["documentclass"], ["class"], "Document class")
-        add(["usepackage", "RequirePackage"], ["package"], "Load a LaTeX package")
+        result.append(.template(#"\documentclass[options]{class}"#, detail: "Document class and options", source: #"\documentclass[«»]{«article»}"#, searchText: #"\documentclass"#))
+        for name in ["usepackage", "RequirePackage"] {
+            result.append(.template("\\\(name)[options]{package}", detail: "Load a LaTeX package with options", source: "\\\(name)[«»]{«»}", searchText: "\\" + name))
+        }
         add(["begin", "end"], ["environment"], "LaTeX environment")
-        add(["input", "include", "includegraphics"], ["file"], "Insert a project file")
+        add(["input", "include"], ["file"], "Insert a project file")
+        result.append(.template(#"\includegraphics[width]{file}"#, detail: "Image with editable width · graphicx package", source: #"\includegraphics[width=«0.5\linewidth»]{«»}"#, searchText: #"\includegraphics"#))
         add(["bibliography", "addbibresource"], ["file"], "Project bibliography file")
         add(["bibliographystyle"], ["style"], "BibTeX style")
         add(["frac", "dfrac", "tfrac", "binom"], ["numerator", "denominator"], "Math fraction or binomial")

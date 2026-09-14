@@ -18,12 +18,15 @@ public struct CompletionItem: Equatable, Sendable {
     public let title: String
     public let detail: String
     public let insertion: String
-    public let stops: [Int]
+    /// UTF-16 ranges of editable fields, followed by the final insertion point.
+    public let fields: [NSRange]
+    public var stops: [Int] { fields.map(\.location) }
     let searchText: String
 
-    init(_ title: String, detail: String, insertion: String? = nil, stops: [Int] = [], searchText: String? = nil) {
+    init(_ title: String, detail: String, insertion: String? = nil, stops: [Int] = [], fields: [NSRange]? = nil, searchText: String? = nil) {
         self.title = title; self.detail = detail; self.insertion = insertion ?? title
-        self.stops = stops; self.searchText = searchText ?? title + " " + detail
+        self.fields = fields ?? stops.map { NSRange(location: $0, length: 0) }
+        self.searchText = searchText ?? title + " " + detail
     }
 
     static func command(_ name: String, arguments: [String] = [], detail: String) -> Self {
@@ -91,9 +94,18 @@ struct CompletionDocument: Sendable {
 
 public enum LaTeXCompletion {
     public static func suggestions(in source: String, at cursor: Int, file: String, project: CompletionProject,
-                                   liveBuffers: [String: String] = [:], files: [String] = [], explicit: Bool = false) -> CompletionResult? {
-        guard cursor >= 0, cursor <= (source as NSString).length,
-              let context = CompletionLexing.context(in: source, at: cursor) else { return nil }
+                                   liveBuffers: [String: String] = [:], files: [String] = [], explicit: Bool = false,
+                                   formatting: CompletionFormatting? = nil) -> CompletionResult? {
+        let ns = source as NSString
+        guard cursor >= 0, cursor <= ns.length else { return nil }
+        var context = CompletionLexing.context(in: source, at: cursor)
+        // Also complete an opener after the user types/skips its closing brace.
+        if context == nil, cursor > 0, ns.character(at: cursor - 1) == 125,
+           let opener = CompletionLexing.context(in: source, at: cursor - 1), opener.kind == .environment, opener.command == "begin" {
+            context = opener
+        }
+        guard let context else { return nil }
+        var replacementRange = context.range
         var project = project
         for (path, text) in liveBuffers { project.update(text, file: path) }
         project.update(source, file: file)
@@ -108,7 +120,7 @@ public enum LaTeXCompletion {
             let suffix = (source as NSString).substring(from: NSMaxRange(context.range)).drop(while: { $0.isWhitespace })
             if suffix.first == "{" || suffix.first == "[" {
                 candidates = candidates.map { item in
-                    let name = String(item.insertion.prefix { $0 != "{" })
+                    let name = String(item.insertion.prefix { $0 != "{" && $0 != "[" })
                     return CompletionItem(item.title, detail: item.detail, insertion: name, searchText: item.searchText)
                 }
             }
@@ -118,7 +130,9 @@ public enum LaTeXCompletion {
             guard explicit || !context.query.isEmpty else { return nil }
             let currentTitle = (source as NSString).substring(with: context.range)
             candidates = documents.flatMap(\.headings).filter { $0.insertion != currentTitle }
-        case .environment: candidates = CompletionCatalog.environments.map { CompletionItem($0, detail: "LaTeX environment") }
+        case .environment:
+            let completion = CompletionEnvironments.suggestions(context: context, source: source, formatting: formatting ?? .inferred(from: source))
+            replacementRange = completion.range; candidates = completion.items
         case .file:
             candidates = files.filter { path in
                 let ext = (path as NSString).pathExtension.lowercased()
@@ -138,7 +152,7 @@ public enum LaTeXCompletion {
         let ranked = candidates.compactMap { item -> (CompletionItem, Int)? in
             let identity = context.kind == .command ? item.searchText : item.insertion
             guard seen.insert(identity).inserted, !context.excluded.contains(item.insertion) else { return nil }
-            let key = item.insertion.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            let key = (context.kind == .environment ? item.title : item.insertion).folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
             let search = item.searchText.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
             if key.hasPrefix(query) { return (item, key == query ? 0 : 1) }
             guard context.kind != .command, terms.allSatisfy({ search.contains($0) }) else { return nil }
@@ -148,6 +162,6 @@ public enum LaTeXCompletion {
             return lhs.0.title.localizedStandardCompare(rhs.0.title) == .orderedAscending
         }
         guard !ranked.isEmpty else { return nil }
-        return CompletionResult(kind: context.kind, range: context.range, query: context.query, items: Array(ranked.prefix(100).map(\.0)))
+        return CompletionResult(kind: context.kind, range: replacementRange, query: context.query, items: Array(ranked.prefix(100).map(\.0)))
     }
 }

@@ -8,8 +8,7 @@ import TeXiumCore
     private var task: Task<Void, Never>?
     private var result: CompletionResult?
     private var requestID = UUID()
-    private var snippetStops: [Int] = []
-    private var activeStop = 0
+    private var snippet: CompletionSnippetSession?
     var isVisible: Bool { popup.isVisible }
 
     init(editor: LaTeXTextView) {
@@ -19,7 +18,7 @@ import TeXiumCore
     }
     func dismiss(clearSnippet: Bool = false) {
         requestID = UUID(); task?.cancel(); task = nil; result = nil; popup.close()
-        if clearSnippet { snippetStops = []; activeStop = 0 }
+        if clearSnippet { snippet = nil }
     }
     func refreshIfVisible() { if isVisible { request() } }
     func request(explicit: Bool = false) {
@@ -32,11 +31,12 @@ import TeXiumCore
         let project = session.completionProject
         let live = Dictionary(uniqueKeysWithValues: session.buffers.values.map { ($0.path, $0.text) })
         let files = session.files.map(\.path)
+        let formatting = CompletionFormatting(indentation: editor.indentation, lineEnding: session.currentBuffer?.file.lineEnding ?? "\n")
         let id = UUID(); requestID = id
         task = Task { [weak self, weak editor] in
             do { try await Task.sleep(for: .milliseconds(explicit ? 0 : 90)) } catch { return }
             let result = await Task.detached(priority: .userInitiated) {
-                LaTeXCompletion.suggestions(in: source, at: selection.location, file: file, project: project, liveBuffers: live, files: files, explicit: explicit)
+                LaTeXCompletion.suggestions(in: source, at: selection.location, file: file, project: project, liveBuffers: live, files: files, explicit: explicit, formatting: formatting)
             }.value
             guard !Task.isCancelled, let self, let editor, self.requestID == id, editor.string == source,
                   editor.selectedRange() == selection, editor.window?.firstResponder === editor,
@@ -64,17 +64,11 @@ import TeXiumCore
     }
     func selectionChanged() {
         dismiss()
-        guard let editor, let first = snippetStops.first, let last = snippetStops.last else { return }
-        if editor.selectedRange().location < first || NSMaxRange(editor.selectedRange()) > last { snippetStops = [] }
+        guard let editor else { return }
+        if snippet?.trackSelection(editor.selectedRange()) == false { snippet = nil }
     }
     func willReplace(_ range: NSRange, with text: String) {
-        guard let first = snippetStops.first, let last = snippetStops.last else { return }
-        guard range.location >= first, NSMaxRange(range) <= last else { snippetStops = []; return }
-        let delta = (text as NSString).length - range.length
-        for index in snippetStops.indices where index > activeStop {
-            if snippetStops[index] >= NSMaxRange(range) { snippetStops[index] += delta }
-            else { snippetStops = []; return }
-        }
+        if snippet?.replace(range, with: text) == false { snippet = nil }
     }
     private func accept(_ index: Int) {
         guard let editor, editor.isEditable, let result, result.items.indices.contains(index) else { return }
@@ -82,22 +76,20 @@ import TeXiumCore
         dismiss()
         editor.insertCompletionText(item.insertion, range: result.range)
         let base = result.range.location
-        if !item.stops.isEmpty { snippetStops = item.stops.map { base + $0 }; activeStop = 0 }
-        let cursor = item.stops.first.map { base + $0 } ?? base + (item.insertion as NSString).length
-        editor.setSelectedRange(NSRange(location: cursor, length: 0)); editor.scrollRangeToVisible(editor.selectedRange())
+        if !item.fields.isEmpty { snippet = CompletionSnippetSession(fields: item.fields, base: base) }
+        let selection = item.fields.first.map { NSRange(location: base + $0.location, length: $0.length) }
+            ?? NSRange(location: base + (item.insertion as NSString).length, length: 0)
+        editor.setSelectedRange(selection); editor.scrollRangeToVisible(selection)
         editor.undoManager?.setActionName("Complete LaTeX")
         // A command snippet immediately opens its label/citation choices.
         if !item.stops.isEmpty { request() }
     }
     private func advanceSnippet(backwards: Bool) -> Bool {
-        guard let editor, !snippetStops.isEmpty else { return false }
-        let next = activeStop + (backwards ? -1 : 1)
-        guard snippetStops.indices.contains(next) else { return false }
-        let position = snippetStops[next]
-        guard position <= (editor.string as NSString).length else { snippetStops = []; return false }
-        dismiss(); activeStop = next
-        editor.setSelectedRange(NSRange(location: position, length: 0))
-        if next == snippetStops.count - 1 { snippetStops = [] } else { request() }
+        guard let editor, let selection = snippet?.advance(backwards: backwards) else { return false }
+        guard NSMaxRange(selection) <= (editor.string as NSString).length else { snippet = nil; return false }
+        dismiss()
+        editor.setSelectedRange(selection); editor.scrollRangeToVisible(selection)
+        if snippet?.isAtEnd == true { snippet = nil } else { request() }
         return true
     }
 }

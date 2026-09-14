@@ -1,6 +1,69 @@
 import XCTest
 
 final class TeXiumUITests: XCTestCase {
+    @MainActor func testEnvironmentTemplateWorkflow() throws {
+        continueAfterFailure = false
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("TeXium-Templates-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try "\\documentclass{article}\n".write(to: root.appendingPathComponent("main.tex"), atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let app = XCUIApplication()
+        app.launchArguments = ["--project", root.path, "-ApplePersistenceIgnoreState", "YES", "-completion", "YES", "-autoClose", "YES", "-useSpaces", "YES", "-tabWidth", "4"]
+        app.launch(); defer { app.terminate() }
+        let editor = app.textViews["source-editor"].firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 15))
+        editor.click(); editor.typeKey(.downArrow, modifierFlags: [.command]); editor.typeKey(.rightArrow, modifierFlags: [])
+        editor.typeText("\\beg")
+        XCTAssertTrue(app.staticTexts["completion-\\begin{}"].waitForExistence(timeout: 5))
+        editor.typeKey(.tab, modifierFlags: []); editor.typeText("fig")
+        XCTAssertTrue(app.staticTexts["completion-figure"].waitForExistence(timeout: 5))
+        editor.typeKey(.tab, modifierFlags: [])
+        editor.typeText("chart.pdf"); editor.typeKey(.tab, modifierFlags: [])
+        editor.typeText("First caption"); editor.typeKey(.tab, modifierFlags: [])
+        editor.typeKey(.tab, modifierFlags: [.shift]); editor.typeText("Figure caption")
+        editor.typeKey(.tab, modifierFlags: []); editor.typeText("fig:chart"); editor.typeKey(.tab, modifierFlags: [])
+        let figure = "\\begin{figure}\n    \\centering\n    \\includegraphics[width=0.5\\linewidth]{chart.pdf}\n    \\caption{Figure caption}\n    \\label{fig:chart}\n\\end{figure}"
+        XCTAssertTrue((editor.value as? String)?.hasSuffix(figure) == true, editor.value as? String ?? "")
+
+        editor.typeText("\n\\begin{enum")
+        XCTAssertTrue(app.staticTexts["completion-enumerate"].waitForExistence(timeout: 5))
+        let before = editor.value as? String
+        editor.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue((editor.value as? String)?.hasSuffix("\\begin{enumerate}\n    \\item \n\\end{enumerate}") == true)
+        editor.typeKey("z", modifierFlags: [.command])
+        XCTAssertEqual(editor.value as? String, before, "One undo must restore the entire environment completion")
+        editor.typeKey(.rightArrow, modifierFlags: []) // Undo selects the restored token; collapse it before requesting suggestions.
+        editor.typeKey(.escape, modifierFlags: [.control])
+        XCTAssertTrue(app.staticTexts["completion-enumerate"].waitForExistence(timeout: 5))
+        editor.typeKey(.tab, modifierFlags: []); editor.typeText("Numbered item"); editor.typeKey(.tab, modifierFlags: [])
+        XCTAssertTrue((editor.value as? String)?.hasSuffix("\\begin{enumerate}\n    \\item Numbered item\n\\end{enumerate}") == true)
+
+        editor.typeText("\n\\begin{itemize}")
+        XCTAssertTrue(app.staticTexts["completion-itemize"].waitForExistence(timeout: 5))
+        editor.typeKey(.tab, modifierFlags: []); editor.typeText("Bullet item"); editor.typeKey(.tab, modifierFlags: [])
+        XCTAssertTrue((editor.value as? String)?.hasSuffix("\\begin{itemize}\n    \\item Bullet item\n\\end{itemize}") == true)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "Complete figure and list templates"; attachment.lifetime = .keepAlways; add(attachment)
+    }
+
+    @MainActor func testTemplateWithoutAutomaticBraceClosure() throws {
+        continueAfterFailure = false
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("TeXium-Template-No-Braces-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try "\\documentclass{article}\n".write(to: root.appendingPathComponent("main.tex"), atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let app = XCUIApplication()
+        app.launchArguments = ["--project", root.path, "-ApplePersistenceIgnoreState", "YES", "-completion", "YES", "-autoClose", "NO", "-useSpaces", "YES", "-tabWidth", "2"]
+        app.launch(); defer { app.terminate() }
+        let editor = app.textViews["source-editor"].firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 15))
+        editor.click(); editor.typeKey(.downArrow, modifierFlags: [.command]); editor.typeKey(.rightArrow, modifierFlags: [])
+        editor.typeText("  \\begin{item")
+        XCTAssertTrue(app.staticTexts["completion-itemize"].waitForExistence(timeout: 5))
+        editor.typeKey(.tab, modifierFlags: []); editor.typeText("Nested item"); editor.typeKey(.tab, modifierFlags: [])
+        XCTAssertTrue((editor.value as? String)?.hasSuffix("  \\begin{itemize}\n    \\item Nested item\n  \\end{itemize}") == true)
+    }
+
     @MainActor func testContextCompletionWorkflow() throws {
         continueAfterFailure = false
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("TeXium-Completion-" + UUID().uuidString)
@@ -16,6 +79,7 @@ final class TeXiumUITests: XCTestCase {
         XCTAssertTrue(editor.waitForExistence(timeout: 15))
         editor.click(); editor.typeKey(.downArrow, modifierFlags: [.command]); editor.typeKey(.rightArrow, modifierFlags: [])
         let choices = app.tables["latex-completions"]
+        editor.typeText("\n")
         editor.typeText("\\sec")
         XCTAssertTrue(choices.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["completion-\\section{}"].waitForExistence(timeout: 5))

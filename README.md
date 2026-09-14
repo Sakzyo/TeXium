@@ -8,7 +8,7 @@ A native macOS workspace for writing, typesetting, and exploring LaTeX. Projects
 
 - Multiple project windows, recent projects, pinned projects, native file navigation, tabs, and Settings.
 - An AppKit text editor with customizable incremental LaTeX coloring, line numbers, native undo/find, brace and environment matching, indentation, completion, and outline navigation.
-- Context-aware code completion with command snippets, custom macros, project labels with section context, searchable bibliography metadata, and section-heading suggestions. See [code completion](docs/COMPLETION.md).
+- Context-aware code completion with complete figure/list/table templates, editable snippet fields, custom macros, project labels with section context, searchable bibliography metadata, and section-heading suggestions. See [code completion](docs/COMPLETION.md).
 - Local `latexmk` builds with pdfLaTeX, XeLaTeX, LuaLaTeX, or LaTeX → PDF; debounced automatic builds, cancellation, structured diagnostics, and complete logs.
 - PDFKit preview, thumbnails, search, zoom, printing, export, and bidirectional SyncTeX. Failed builds preserve the last successful PDF.
 - BibTeX browsing and citation completion; equation, table, figure, and symbol assistants; local notes and `texcount` word counts.

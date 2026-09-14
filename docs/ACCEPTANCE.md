@@ -83,6 +83,14 @@ Completion uses local source analysis rather than a TeX interpreter or online la
 
 The Download PDF toolbar button was checked in the isolated verification app with a disposable project: it appears immediately beside Compile, is disabled before the first PDF exists, and becomes enabled after successful compilation. It opens the existing native PDF save dialog. The saved PDF matched the compiled preview byte for byte. Native Debug and universal Release builds passed.
 
+## Complete environment template verification
+
+`./script/test.sh --filter Completion` passed 27 tests with zero failures or skips. The 12 template tests cover complete figure/list/table structures, selected defaults and field navigation, required environment arguments, nested same-name environments, preservation of existing options/bodies/ends, both closing-brace positions and missing braces, custom indentation, CRLF/UTF-16 offsets, command options, and valid ordered fields across the catalog. The compilation test fills the generated figure, itemize, enumerate, description, table, tabularx, equation, matrix, minipage, and frame templates, builds article and Beamer PDFs with the normal compilation service, and checks rendered text.
+
+The isolated Debug app passed the context completion regression (27.279 seconds) and complete template workflow (23.264 seconds), recorded in `.build/UI-20260914-173850.xcresult`. The template workflow accepts a figure through `\begin{}`, replaces its image/caption/label fields, returns to an edited caption with Shift-Tab, accepts and undoes an enumerate template, and completes itemize after typing its closing brace. A separate test with brace closure disabled and two-space indentation passed in 8.679 seconds in `.build/UI-20260914-173607.xcresult`, against the same application source. Initial test failures were traced to a lost first synthetic backslash and the native undo operation selecting the restored token; the rerun primes keyboard input and collapses that selection before explicitly requesting suggestions.
+
+The successful native screenshot was inspected for complete structures and indentation: [figure and list templates](screenshots/completion-templates.png). The universal Release app was rebuilt, relaunched, and remained running through the ten-second restoration check. The Release ZIP was extracted to a clean temporary directory, passed strict signature verification, and contained both arm64 and x86_64 executable slices.
+
 ## Required before public release
 
 - Expand the automated UI suite for template creation, error navigation, all insertion assistants, and native PDF/source export dialogs.
