@@ -122,7 +122,7 @@ struct TeXiumCommands: Commands {
             Button("Refresh References") { Task { await session?.refreshIndex() } }
         }
         CommandGroup(replacing: .help) {
-            Button("TeXium Help") { let alert = NSAlert(); alert.messageText = "Write and typeset locally"; alert.informativeText = "Open a LaTeX folder or create a project. Choose a main .tex file, edit, then press ⌘R to compile.\n\n⌘F Find · ⌥⌘F Project search\n⌘⇧J Source → PDF\n⌘-click PDF → Source\nEsc Native completion\n⌘/ Toggle comment\n\nRequires a local TeX distribution with latexmk. Settings → LaTeX tests your installation."; alert.runModal() }
+            Button("TeXium Help") { let alert = NSAlert(); alert.messageText = "Write and typeset locally"; alert.informativeText = "Open a LaTeX folder or create a project. Choose a main .tex file, edit, then press ⌘R to compile.\n\n⌘F Find · ⌥⌘F Project search\n⌘⇧J Source → PDF\n⌘-click PDF → Source\nControl-Space Completion · Tab Accept / next argument\n⌘/ Toggle comment\n\nRequires a local TeX distribution with latexmk. Settings → LaTeX tests your installation."; alert.runModal() }
         }
     }
     private func find() {

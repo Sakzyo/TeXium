@@ -1,6 +1,63 @@
 import XCTest
 
 final class TeXiumUITests: XCTestCase {
+    @MainActor func testContextCompletionWorkflow() throws {
+        continueAfterFailure = false
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("TeXium-Completion-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try "\\documentclass{article}\n".write(to: root.appendingPathComponent("main.tex"), atomically: true, encoding: .utf8)
+        try "\\section{Introduction to topology}\n\\label{sec:intro}\n".write(to: root.appendingPathComponent("chapter.tex"), atomically: true, encoding: .utf8)
+        try "@book{knuth1984, title={The TeXbook}, author={Donald Knuth}, year={1984}}\n".write(to: root.appendingPathComponent("refs.bib"), atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let app = XCUIApplication()
+        app.launchArguments = ["--project", root.path, "-ApplePersistenceIgnoreState", "YES", "-completion", "YES", "-autoClose", "YES"]
+        app.launch(); defer { app.terminate() }
+        let editor = app.textViews["source-editor"].firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 15))
+        editor.click(); editor.typeKey(.downArrow, modifierFlags: [.command]); editor.typeKey(.rightArrow, modifierFlags: [])
+        let choices = app.tables["latex-completions"]
+        editor.typeText("\\sec")
+        XCTAssertTrue(choices.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["completion-\\section{}"].waitForExistence(timeout: 5))
+        editor.typeKey(.tab, modifierFlags: [])
+        editor.typeText("Fresh heading"); editor.typeKey(.tab, modifierFlags: [])
+        XCTAssertTrue((editor.value as? String)?.hasSuffix("\\section{Fresh heading}") == true)
+
+        editor.typeText("\n\\ref")
+        XCTAssertTrue(app.staticTexts["completion-\\ref{}"].waitForExistence(timeout: 5))
+        editor.typeKey(.tab, modifierFlags: [])
+        editor.typeText("topology")
+        XCTAssertTrue(app.staticTexts["completion-sec:intro"].waitForExistence(timeout: 5))
+        editor.typeKey(.return, modifierFlags: []); editor.typeKey(.tab, modifierFlags: [])
+        XCTAssertTrue((editor.value as? String)?.hasSuffix("\\ref{sec:intro}") == true)
+
+        editor.typeText("\n\\cite")
+        XCTAssertTrue(app.staticTexts["completion-\\cite{}"].waitForExistence(timeout: 5))
+        editor.typeKey(.tab, modifierFlags: [])
+        editor.typeText("TeXbook")
+        XCTAssertTrue(app.staticTexts["completion-knuth1984"].waitForExistence(timeout: 5))
+        editor.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue((editor.value as? String)?.hasSuffix("\\cite{knuth1984}") == true)
+        editor.typeKey("z", modifierFlags: [.command])
+        XCTAssertTrue((editor.value as? String)?.hasSuffix("\\cite{TeXbook}") == true, "Accepting completion must undo as one edit")
+
+        editor.typeKey(.downArrow, modifierFlags: [.command]); editor.typeKey(.rightArrow, modifierFlags: [])
+        editor.typeText("\n\\fra")
+        XCTAssertTrue(app.staticTexts["completion-\\frac{}{}"].waitForExistence(timeout: 5))
+        editor.typeKey(.tab, modifierFlags: [])
+        editor.typeText("a"); editor.typeKey(.tab, modifierFlags: []); editor.typeText("b"); editor.typeKey(.tab, modifierFlags: [])
+        XCTAssertTrue((editor.value as? String)?.hasSuffix("\\frac{a}{b}") == true)
+
+        editor.typeText("\n\\sec")
+        XCTAssertTrue(choices.waitForExistence(timeout: 5))
+        editor.typeKey(.escape, modifierFlags: [])
+        XCTAssertFalse(choices.exists)
+        XCTAssertTrue((editor.value as? String)?.hasSuffix("\\sec") == true)
+        editor.typeKey("s", modifierFlags: [.command])
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "Context completion workflow"; attachment.lifetime = .keepAlways; add(attachment)
+    }
+
     @MainActor func testCompiledWorkspaceRestoresAfterRelaunch() throws {
         continueAfterFailure = false
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("TeXium-Restore-" + UUID().uuidString)

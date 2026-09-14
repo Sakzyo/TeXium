@@ -36,7 +36,9 @@ struct SettingsView: View {
                 Toggle("Highlight current line", isOn: $currentLine)
                 Toggle("Syntax highlighting", isOn: $highlighting)
                 Toggle("Close braces and brackets", isOn: $autoClose)
-                Toggle("LaTeX completion", isOn: $completion)
+                Toggle("Automatic code completion", isOn: $completion)
+                Text("Suggest commands, labels, citations, and headings as you type. Use ↑↓ to select, Tab or Return to insert, and Escape to dismiss. Control-Space opens suggestions; Tab moves through command arguments.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Check spelling", isOn: $spelling)
             }.tabItem { Label("Editor", systemImage: "text.cursor") }
             SyntaxColorSettings().tabItem { Label("Syntax Colors", systemImage: "paintpalette") }

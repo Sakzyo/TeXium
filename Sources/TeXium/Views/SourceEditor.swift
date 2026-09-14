@@ -10,6 +10,7 @@ struct SourceEditor: NSViewRepresentable {
     @AppStorage("lineNumbers") private var numbers = true
     @AppStorage("highlighting") private var highlighting = true
     @AppStorage(SyntaxPalette.defaultsKey) private var savedColors = Data()
+    @AppStorage("completion") private var completion = true
     @AppStorage("spellCheck") private var spelling = false
     func makeCoordinator() -> Coordinator { Coordinator(session: session, buffer: buffer) }
     func makeNSView(context: Context) -> NSScrollView {
@@ -44,6 +45,7 @@ struct SourceEditor: NSViewRepresentable {
         coordinator.buffer = buffer; editor.session = session; session.editor = editor
         configure(editor); scroll.rulersVisible = numbers
         if changedBuffer || editor.string != buffer.text {
+            editor.completionController.dismiss(clearSnippet: true)
             coordinator.updating = true
             editor.string = buffer.text
             if changedBuffer { editor.undoManager?.removeAllActions() }
@@ -61,8 +63,13 @@ struct SourceEditor: NSViewRepresentable {
             DispatchQueue.main.async { editor.wrapSelection(before: insertion.before, after: insertion.after) }
         }
     }
+    static func dismantleNSView(_ scroll: NSScrollView, coordinator: Coordinator) {
+        (scroll.documentView as? LaTeXTextView)?.completionController.dismiss(clearSnippet: true)
+    }
     private func configure(_ editor: LaTeXTextView) {
         editor.isEditable = !session.operationBusy
+        editor.completionEnabled = completion
+        if session.operationBusy { editor.completionController.dismiss(clearSnippet: true) }
         let chosen = NSFont(name: font, size: size) ?? .monospacedSystemFont(ofSize: size, weight: .regular)
         if editor.font != chosen { editor.font = chosen; editor.highlight(NSRange(location: 0, length: (editor.string as NSString).length)) }
         editor.syntaxPalette = SyntaxPalette(data: savedColors)
@@ -79,6 +86,7 @@ struct SourceEditor: NSViewRepresentable {
         var originalRange = NSRange(location: 0, length: 0)
         init(session: ProjectSession, buffer: SourceBuffer) { self.session = session; self.buffer = buffer }
         func textView(_ textView: NSTextView, shouldChangeTextIn affectedCharRange: NSRange, replacementString: String?) -> Bool {
+            if !session.operationBusy { editor?.completionController.willReplace(affectedCharRange, with: replacementString ?? "") }
             originalRange = affectedCharRange
             editedRange = NSRange(location: affectedCharRange.location, length: (replacementString as NSString?)?.length ?? 0); return !session.operationBusy
         }
@@ -93,6 +101,7 @@ struct SourceEditor: NSViewRepresentable {
         func textViewDidChangeSelection(_ notification: Notification) {
             guard !updating, let editor else { return }
             buffer.selection = editor.selectedRange(); editor.needsDisplay = true
+            editor.completionController.selectionChanged()
             editor.enclosingScrollView?.verticalRulerView?.needsDisplay = true
         }
     }
@@ -100,6 +109,30 @@ struct SourceEditor: NSViewRepresentable {
 
 @MainActor final class LaTeXTextView: NSTextView {
     weak var session: ProjectSession?
+    lazy var completionController = EditorCompletionController(editor: self)
+    var completionEnabled = true {
+        didSet { if !completionEnabled { completionController.dismiss(clearSnippet: true) } }
+    }
+    override func keyDown(with event: NSEvent) {
+        if !completionController.handle(event) { super.keyDown(with: event) }
+    }
+    override func mouseDown(with event: NSEvent) {
+        completionController.dismiss(clearSnippet: true); super.mouseDown(with: event)
+    }
+    override func resignFirstResponder() -> Bool {
+        completionController.dismiss(clearSnippet: true); return super.resignFirstResponder()
+    }
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if newWindow == nil { completionController.dismiss(clearSnippet: true) }
+        super.viewWillMove(toWindow: newWindow)
+    }
+    override func complete(_ sender: Any?) { completionController.request(explicit: true) }
+    override func deleteBackward(_ sender: Any?) {
+        super.deleteBackward(sender); completionController.request()
+    }
+    func insertCompletionText(_ text: String, range: NSRange) {
+        breakUndoCoalescing(); super.insertText(text, replacementRange: range); breakUndoCoalescing()
+    }
     var highlightEnabled = true {
         didSet { if oldValue != highlightEnabled { highlight(NSRange(location: 0, length: (string as NSString).length)) } }
     }
@@ -171,6 +204,7 @@ struct SourceEditor: NSViewRepresentable {
             setSelectedRange(NSRange(location: range.location + 1, length: 0))
         } else { super.insertText(text, replacementRange: replacementRange) }
         if ["}", "]", ")"].contains(text) { showMatchingBrace() }
+        if text.count == 1 && !text.contains("\n") && !text.contains("\r") { completionController.request() }
     }
     func wrapSelection(before: String, after: String) {
         window?.makeFirstResponder(self)
@@ -211,25 +245,6 @@ struct SourceEditor: NSViewRepresentable {
     func goToMatchingEnvironment() {
         guard let range = LaTeXParser.matchingEnvironment(at: selectedRange().location, in: string) else { NSSound.beep(); return }
         setSelectedRange(range); scrollRangeToVisible(range); showFindIndicator(for: range)
-    }
-    override var rangeForUserCompletion: NSRange {
-        let ns = string as NSString; let end = selectedRange().location; var start = end
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "\\:_-./@"))
-        while start > 0, let scalar = UnicodeScalar(ns.character(at: start - 1)), allowed.contains(scalar) { start -= 1 }
-        return NSRange(location: start, length: end - start)
-    }
-    override func completions(forPartialWordRange charRange: NSRange, indexOfSelectedItem index: UnsafeMutablePointer<Int>) -> [String]? {
-        guard UserDefaults.standard.object(forKey: "completion") as? Bool ?? true else { return nil }
-        let ns = string as NSString; let prefix = ns.substring(with: charRange)
-        let before = ns.substring(to: charRange.location)
-        let commands = ["\\documentclass", "\\usepackage", "\\begin", "\\end", "\\section", "\\subsection", "\\subsubsection", "\\chapter", "\\paragraph", "\\textbf", "\\textit", "\\emph", "\\item", "\\label", "\\ref", "\\eqref", "\\autoref", "\\pageref", "\\cite", "\\citep", "\\citet", "\\parencite", "\\textcite", "\\input", "\\include", "\\includegraphics", "\\caption", "\\footnote", "\\frac", "\\sqrt", "\\sum", "\\int", "\\alpha", "\\beta", "\\gamma", "\\theta", "\\lambda", "\\pi", "\\infty", "\\left", "\\right", "\\mathrm", "\\mathbf", "\\mathbb", "\\operatorname", "\\bibliography", "\\bibliographystyle", "\\addbibresource", "\\printbibliography", "\\tableofcontents", "\\maketitle", "\\newcommand", "\\renewcommand", "\\href", "\\url"]
-        var candidates = commands
-        if before.range(of: #"\\[a-zA-Z]*cite[a-zA-Z]*\*?(?:\[[^\]]*\])*\{[^}]*$"#, options: .regularExpression) != nil { candidates = session?.references.map(\.key) ?? [] }
-        else if before.range(of: #"\\(?:auto|eq|page)?ref\{[^}]*$"#, options: .regularExpression) != nil { candidates = session?.labels ?? [] }
-        else if before.range(of: #"\\(?:begin|end)\{$"#, options: .regularExpression) != nil { candidates = ["document", "equation", "align", "gather", "matrix", "pmatrix", "cases", "itemize", "enumerate", "figure", "table", "tabular", "abstract", "center", "verbatim", "frame", "theorem", "proof"] }
-        else if before.range(of: #"\\(?:input|include|includegraphics|addbibresource)(?:\[[^\]]*\])?\{$"#, options: .regularExpression) != nil { candidates = session?.files.map(\.path) ?? [] }
-        index.pointee = 0
-        return Array(Set(candidates)).filter { $0.range(of: prefix, options: [.anchored, .caseInsensitive]) != nil }.sorted()
     }
 }
 

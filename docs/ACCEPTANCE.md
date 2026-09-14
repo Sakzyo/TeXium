@@ -9,6 +9,8 @@ Validation date: 2026-09-14. Host: Apple silicon, macOS 26.5.2, Xcode 26.6, Swif
 | Swift package service baseline | 41 tests, zero failures, zero skips before the syntax-color feature |
 | Offline service baseline | The same 41 tests passed with network access denied to the runner and descendants |
 | Syntax palette and highlighter | Five focused tests passed with zero failures |
+| Context completion engine | 15 focused tests passed with zero failures |
+| Context completion native UI | Command/heading snippets, label and citation lookup, argument navigation, dismissal, and undo passed in the isolated Debug app |
 | Native Xcode Debug application | Built and launched |
 | Xcode Release UI baseline | Three tests passed together before the syntax-color feature: compiled-project restoration, authoring workflow, and uncompiled workspace layout |
 | Release startup/restoration | Existing saved window state remained running through the extended 10-second launch check; no matching layout-constraint errors |
@@ -66,6 +68,16 @@ In the separate verification app, **Settings → Syntax Colors** changed command
 `./script/test.sh --filter SyntaxHighlightingTests` passed five tests covering hex validation, UserDefaults persistence, individual resets, malformed preference recovery, all seven text categories, comment precedence, incremental recoloring, disabling highlighting, and preservation of source text and unrelated attributes. The final native Debug test build and universal Release build succeeded; Release remained running through its ten-second startup check. The final Release ZIP passed strict signature verification after extraction to a fresh temporary directory.
 
 The GUI automation runner could not reliably activate Settings for a native color-panel interaction probe, so native panel selection is not recorded as an automated pass. The hex-field workflow and resets were verified through the application's native interface. The existing three-test workspace UI result above remains a baseline from before this feature.
+
+## Context-aware completion verification
+
+`./script/test.sh --filter CompletionTests` passed 15 tests. Coverage includes command snippets and argument stops, command replacement within existing code, reference variants, section-title lookup, citation metadata and substring search, optional citation arguments, comma-separated keys, CRLF/Unicode offsets, live-buffer replacement of stale symbols, custom macro signatures and overrides, filtered file/environment suggestions, duplicate keys, and comment/literal exclusions.
+
+The focused native test passed against the final Debug application in 26.108 seconds: `.build/UI-20260914-122943.xcresult`. It exercised automatic popup display, section-heading insertion, referencing a label by its heading title, citing a bibliography entry by its book title, Tab/Return acceptance, multiple argument stops, Escape dismissal, and single-edit undo. One intermediate run failed at initial popup detection while Release startup and UI automation overlapped; the sequential rerun passed without further application changes.
+
+Manual checks in a disposable project verified the visible label list with section titles and file locations, explicit completion, arrow selection, and mouse acceptance while the editor retained focus. [Completion screenshot](screenshots/context-completion.jpg). The final universal Release app passed the ten-second startup/restoration probe, and its ZIP passed strict signature verification after extraction into a clean temporary directory.
+
+Completion uses local source analysis rather than a TeX interpreter or online language service. Full IME/VoiceOver coverage, unusual macro/category-code conventions, and large-document performance remain part of release qualification. See [completion behavior and shortcuts](COMPLETION.md).
 
 ## Required before public release
 

@@ -39,6 +39,7 @@ struct ProjectPreferences: Codable {
     var outline: [OutlineItem] = []
     var references: [BibEntry] = []
     var labels: [String] = []
+    @ObservationIgnored var completionProject = CompletionProject()
     var configuration = BuildConfiguration()
     var notes: [UserNote] = []
     var revisions: [Revision] = []
@@ -219,17 +220,20 @@ struct ProjectPreferences: Codable {
     func refreshIndex() async {
         let root = root; let live = Dictionary(uniqueKeysWithValues: buffers.values.map { ($0.path, $0.text) })
         do {
-            let result = try await Task.detached { () -> ([ProjectFile], [OutlineItem], [BibEntry], [String]) in
+            let result = try await Task.detached { () -> ([ProjectFile], [OutlineItem], [BibEntry], [String], CompletionProject) in
                 let nodes = try ProjectFileSystem.tree(at: root)
                 var outline: [OutlineItem] = []; var references: [BibEntry] = []; var labels: [String] = []
-                for file in ProjectFileSystem.flatten(nodes) where file.path.hasSuffix(".tex") || file.path.hasSuffix(".bib") {
+                var completionProject = CompletionProject()
+                for file in ProjectFileSystem.flatten(nodes) where ["tex", "bib", "sty", "cls"].contains((file.path as NSString).pathExtension.lowercased()) {
                     let text = live[file.path] ?? ((try? ProjectFileSystem.read(ProjectFileSystem.resolve(file.path, in: root)).text) ?? "")
+                    completionProject.update(text, file: file.path)
                     if file.path.hasSuffix(".bib") { references += BibTeXParser.parse(text, file: file.path) }
                     else { outline += LaTeXParser.outline(text, file: file.path); labels += LaTeXParser.keys(text, command: "label") }
                 }
-                return (nodes, outline, references, labels)
+                return (nodes, outline, references, labels, completionProject)
             }.value
             nodes = result.0; outline = result.1; references = result.2; labels = result.3
+            completionProject = result.4; editor?.completionController.refreshIfVisible()
         } catch { self.error = error.localizedDescription }
     }
     func externalChanges() async {

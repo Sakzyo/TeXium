@@ -8,6 +8,7 @@ A native macOS workspace for writing, typesetting, and exploring LaTeX. Projects
 
 - Multiple project windows, recent projects, pinned projects, native file navigation, tabs, and Settings.
 - An AppKit text editor with customizable incremental LaTeX coloring, line numbers, native undo/find, brace and environment matching, indentation, completion, and outline navigation.
+- Context-aware code completion with command snippets, custom macros, project labels with section context, searchable bibliography metadata, and section-heading suggestions. See [code completion](docs/COMPLETION.md).
 - Local `latexmk` builds with pdfLaTeX, XeLaTeX, LuaLaTeX, or LaTeX → PDF; debounced automatic builds, cancellation, structured diagnostics, and complete logs.
 - PDFKit preview, thumbnails, search, zoom, printing, export, and bidirectional SyncTeX. Failed builds preserve the last successful PDF.
 - BibTeX browsing and citation completion; equation, table, figure, and symbol assistants; local notes and `texcount` word counts.
@@ -65,7 +66,9 @@ Build products use a temporary DerivedData directory to avoid Finder metadata on
 | ⌘F / ⌥⌘F | Native file find / Project search |
 | ⌘⇧J | Source → PDF |
 | ⇧⌘U | Synchronize the selected repository |
-| Escape | Native context completion |
+| Control-Space / Control-Escape | Open context completion |
+| ↑ / ↓, Tab / Return, Escape | Select, accept, or dismiss suggestions |
+| Tab / Shift-Tab | Move through inserted command arguments |
 | ⌘/ | Comment / uncomment |
 | ⌘B / ⌘I | Bold / italic |
 | ⌘⇧M | Symbol palette |
@@ -97,7 +100,7 @@ Read [architecture](docs/ARCHITECTURE.md), [security and file integrity](docs/SE
 This is a working **0.1 developer release**, not a notarized public release. Local builds are ad-hoc signed. A Developer ID certificate, release acceptance testing, and Apple's notarization service are still required for distribution.
 
 - No optional visual editor, AI provider, online reference lookup, general-purpose cloud folder synchronization, or updater is included.
-- No code folding, multiple cursors, or Vim/Emacs modes. Completion uses a built-in command vocabulary plus project keys and filenames; it does not interpret arbitrary package definitions.
+- No code folding, multiple cursors, or Vim/Emacs modes. Completion uses a built-in command vocabulary plus project macros, labels, headings, bibliography, and filenames; it does not interpret arbitrary package definitions.
 - Outline, diagnostics, and bibliography parsers are practical source parsers, not a TeX interpreter. BibTeX string macros are preserved but not fully expanded in the browser.
 - TeX's arbitrary source execution is not an OS security sandbox. Only compile trusted projects; see the security document. Project `.latexmkrc` files are deliberately ignored. Index/glossary recipes requiring custom rules need an explicitly configured custom build command.
 - History is local, path-associated, and not a backup service. Hidden files and directory symlinks are omitted. Files over 256 MB block snapshots; editor text files are limited to 32 MB. There is no history retention/pruning UI yet.
