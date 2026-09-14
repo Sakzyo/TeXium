@@ -7,7 +7,7 @@ struct ProjectInspector: View {
     private let tabs = ["Outline", "Problems", "Build Log", "References", "History", "Git", "Notes", "Statistics"]
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Inspector", selection: $session.inspectorTab) { ForEach(tabs, id: \.self) { Text($0).tag($0) } }.labelsHidden().padding(.horizontal, 12).frame(height: 37)
+            Picker("Inspector", selection: $session.inspectorTab) { ForEach(tabs, id: \.self) { Text($0).tag($0) } }.labelsHidden().accessibilityIdentifier("project-inspector-picker").padding(.horizontal, 12).frame(height: 37)
             Divider()
             switch session.inspectorTab {
             case "Outline": OutlineInspector(session: session)

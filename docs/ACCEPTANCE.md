@@ -9,7 +9,7 @@ Validation date: 2026-09-14. Host: Apple silicon, macOS 26.5.2, Xcode 26.6, Swif
 | Swift package suite | 41 tests, zero failures, zero skips on this host |
 | Offline suite | The same 41 tests passed with network access denied to the runner and descendants |
 | Native Xcode Debug application | Built and launched |
-| Xcode UI test target | Builds successfully; execution blocked by macOS automation initialization timeout |
+| Xcode UI tests | Both tests passed in targeted runs: authoring workflow and workspace layout |
 | Release application | Builds for arm64 and x86_64 |
 | Clean Release ZIP | Extracted into a fresh temporary directory; `codesign --verify --deep --strict` passed |
 | Embedded dependencies | Only Apple frameworks and system Swift/runtime libraries; no embedded web runtime or third-party frameworks |
@@ -41,7 +41,9 @@ This denied network access to the tests and TeX processes without disconnecting 
 
 The bundled Research sample was opened in a separate verification application identity. Its native project navigator, NSTextView source, syntax coloring, line numbers, tab switching, PDFKit output, outline selection, source-to-PDF navigation, compile shortcut, full-screen layout, PDF zoom menu, project search, Settings, and tool discovery were exercised. Search returned four occurrences of “Knuth” across two sample files. Editing and native undo were also checked against the bundled sample during development.
 
-The UI test source covers launch, sample opening, compilation/PDF creation, editing/saving/undo, search, inspector toggling, and Settings. Xcode's runner reported **“Timed out while enabling automation mode”**, before the test body executed. Do not report it as a passing UI test. Run `./script/test_ui.sh` in an Xcode-enabled graphical login session to complete that qualification. The separate identifier prevents tests from loading ordinary TeXium recents.
+The UI test source covers launch, sample opening, compilation/PDF creation, editing/saving/undo, search, inspector toggling, and Settings. Both native UI tests passed in targeted runs in this graphical session, including actual compilation, editing/saving/undo, four search matches across two files, and Settings. The separate identifier prevents tests from loading ordinary TeXium recents.
+
+The workspace layout regression opens a new uncompiled project, repeatedly hides/restores both sidebars, and shrinks the window. It asserts source viewport height, preview header/action alignment, and non-overlapping visible pane bounds. This test passed. Manual checks also verified all four sidebar combinations, the first compilation transition, and full screen. [Uncompiled workspace with both sidebars](screenshots/layout-uncompiled.jpg).
 
 ## GitHub synchronization verification
 
@@ -53,7 +55,7 @@ The universal Release ZIP was rebuilt with the feature, extracted outside the Do
 
 ## Required before public release
 
-- Run the automated UI suite successfully; expand it for template creation, error navigation, all insertion assistants, and native PDF/source export dialogs.
+- Expand the automated UI suite for template creation, error navigation, all insertion assistants, and native PDF/source export dialogs.
 - Complete keyboard-only and VoiceOver testing, Full Keyboard Access, Light/Dark appearance, accent-color variants, and reduced-motion checks.
 - Exercise all workflow actions with networking physically disconnected, including native history restore and both export dialogs.
 - Validate older supported macOS versions, Intel execution, large projects/bibliographies/PDFs, external drives, moved folders, and disk-full recovery.

@@ -16,10 +16,10 @@ struct PDFPreview: View {
             HStack(spacing: 10) {
                 Label("Preview", systemImage: "doc.richtext").font(.callout.weight(.medium))
                 Spacer()
-                Button("Previous Page", systemImage: "chevron.up") { session.pdfView?.goToPreviousPage(nil) }.disabled(page <= 1)
+                Button("Previous Page", systemImage: "chevron.up") { session.pdfView?.goToPreviousPage(nil) }.labelStyle(.iconOnly).disabled(page <= 1)
                 TextField("Page", value: $page, format: .number).frame(width: 35).multilineTextAlignment(.center).onSubmit { goToPage() }.accessibilityLabel("PDF page number")
                 Text("of \(pageCount)").font(.caption).foregroundStyle(.secondary)
-                Button("Next Page", systemImage: "chevron.down") { session.pdfView?.goToNextPage(nil) }.disabled(page >= pageCount)
+                Button("Next Page", systemImage: "chevron.down") { session.pdfView?.goToNextPage(nil) }.labelStyle(.iconOnly).disabled(page >= pageCount)
                 Menu {
                     Button("Zoom In") { session.pdfView?.zoomIn(nil) }
                     Button("Zoom Out") { session.pdfView?.zoomOut(nil) }
@@ -43,7 +43,9 @@ struct PDFPreview: View {
                 HStack(spacing: 0) {
                     if thumbnails { PDFThumbnails(session: session).frame(width: 100); Divider() }
                     PDFKitView(session: session, page: $page, count: $pageCount, zoom: $zoom)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 Divider()
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -53,8 +55,11 @@ struct PDFPreview: View {
                 }.padding(10)
             } else {
                 ContentUnavailableView { Label("Your Document, Typeset", systemImage: "doc.richtext") } description: { Text("Compile the project to generate a PDF.\nYour local TeX installation does the rest.") } actions: { Button("Compile Project") { session.compile() }.disabled(session.building) }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        }.frame(minWidth: 290)
+        }.frame(minWidth: 290, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("pdf-pane")
     }
     private func goToPage() { if let target = session.pdfView?.document?.page(at: max(0, min(page - 1, pageCount - 1))) { session.pdfView?.go(to: target) } }
     private func fitWidth() {

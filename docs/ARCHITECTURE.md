@@ -40,6 +40,12 @@ The build-root marker invalidates caches after a directory is copied or moved, b
 
 Forward navigation invokes `synctex view`; inverse navigation invokes `synctex edit`. Coordinates convert between SyncTeX's top-origin page values and PDFKit's page bounds. Inverse paths must resolve inside the project before opening. A context-menu action and Command-click both support inverse navigation.
 
+## Workspace layout
+
+The navigator belongs to `NavigationSplitView`; the inspector is attached to the document detail inside that split. A `GeometryReader` gives the nested source/PDF `HSplitView` an explicit available rectangle, preventing the AppKit-backed split's fitting size from expanding the surrounding SwiftUI splits. The minimum window width accounts for the visible document modes and sidebars.
+
+The editor tab strip stays 37 points tall. The editor, empty PDF state, and loaded PDF canvas all fill the remaining height, so opening an uncompiled project has the same pane geometry as opening a compiled one. PDF page navigation uses compact icon controls to fit narrow panes. Accessibility identifiers mark the navigator, inspector picker, and PDF pane for geometry regression checks.
+
 ## History, bibliography, Git, and exports
 
 `HistoryService` is an actor with SHA-256 content-addressed objects and an atomic revision manifest. Automatic identical snapshots deduplicate. Restores validate every requested object before writing, retain a pre-restore snapshot, and preserve newer history. A multi-file restore is not an OS-wide transaction; an interrupted restore can be recovered using that retained snapshot. `/usr/bin/diff` generates comparisons.

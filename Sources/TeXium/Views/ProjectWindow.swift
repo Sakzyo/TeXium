@@ -16,18 +16,30 @@ struct ProjectWindow: View {
             ProjectNavigator(session: session).navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 380).disabled(session.operationBusy)
         } detail: {
             VStack(spacing: 0) {
-                HSplitView {
-                    if session.layout != "PDF" { EditorPane(session: session).frame(minWidth: 320) }
-                    if session.layout != "Source" { PDFPreview(session: session).frame(minWidth: 290) }
+                GeometryReader { geometry in
+                    // NSSplitView-backed content must follow the allocated detail
+                    // rectangle rather than feeding its fitting size back into
+                    // the surrounding navigation/inspector split views.
+                    HSplitView {
+                        if session.layout != "PDF" { EditorPane(session: session).frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity) }
+                        if session.layout != "Source" { PDFPreview(session: session).frame(minWidth: 290, maxWidth: .infinity, maxHeight: .infinity) }
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
                 }
                 Divider()
                 statusBar
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // The inspector belongs to the document detail, not to the outer
+            // navigation split. Each sidebar then gets its own sizing boundary.
+            .inspector(isPresented: $session.showInspector) {
+                ProjectInspector(session: session)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .inspectorColumnWidth(min: 240, ideal: 280, max: 500)
+            }
         }
-        .inspector(isPresented: $session.showInspector) {
-            ProjectInspector(session: session).inspectorColumnWidth(min: 240, ideal: 280, max: 500)
-        }
-        .frame(minWidth: 880, minHeight: 560)
+        .navigationSplitViewStyle(.balanced)
+        .frame(minWidth: minimumWindowWidth, minHeight: 560)
         .navigationTitle(session.title)
         .navigationSubtitle(session.configuration.mainFile)
         .toolbar { toolbar }
@@ -59,6 +71,10 @@ struct ProjectWindow: View {
             Button("Recover Edits") { Task { await session.recoverBuffers() } }
             Button("Keep Files on Disk") { session.recoveryAvailable = [:]; session.writeRecovery() }
         } message: { Text("Recovery copies are available for \(session.recoveryAvailable.count) source files from an earlier session.") }
+    }
+    private var minimumWindowWidth: CGFloat {
+        let document: CGFloat = session.layout == "Both" ? 640 : 320
+        return max(880, document + (session.showNavigator ? 180 : 0) + (session.showInspector ? 240 : 0) + 40)
     }
     private var statusBar: some View {
         HStack(spacing: 14) {
@@ -115,7 +131,7 @@ struct ProjectNavigator: View {
                     .onDrop(of: [UTType.fileURL], isTargeted: nil) { providers in session.acceptDrop(providers, folder: node.isDirectory ? node.path : (node.path as NSString).deletingLastPathComponent, move: !NSEvent.modifierFlags.contains(.option)) }
                 }
             }
-        }.listStyle(.sidebar)
+        }.listStyle(.sidebar).accessibilityIdentifier("project-navigator")
         .onChange(of: selected) { _, path in if let path { Task { await session.select(path) } } }
         .onChange(of: session.selected) { _, path in selected = path }
         .onDrop(of: [UTType.fileURL], isTargeted: nil) { session.acceptDrop($0, folder: "", move: !NSEvent.modifierFlags.contains(.option)) }
@@ -161,10 +177,12 @@ struct EditorPane: View {
                         }
                     }
                 }
+                .frame(height: 37)
                 Divider()
             }
             if let buffer = session.currentBuffer {
                 SourceEditor(session: session, buffer: buffer)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onDrop(of: [UTType.fileURL], isTargeted: nil) { providers in
                         for provider in providers {
                             _ = provider.loadObject(ofClass: NSURL.self) { value, _ in
@@ -184,6 +202,7 @@ struct EditorPane: View {
                 ContentUnavailableView("Choose a Source File", systemImage: "doc.text", description: Text("Select a file in the navigator, or create a new one."))
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 struct AssetPreview: View {
