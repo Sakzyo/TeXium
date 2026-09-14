@@ -17,21 +17,13 @@ struct ProjectWindow: View {
         } detail: {
             VStack(spacing: 0) {
                 GeometryReader { geometry in
-                    // NSSplitView-backed content must follow the allocated detail
-                    // rectangle rather than feeding its fitting size back into
-                    // the surrounding navigation/inspector split views.
-                    HSplitView {
-                        if session.layout != "PDF" { EditorPane(session: session).frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity) }
-                        if session.layout != "Source" { PDFPreview(session: session).frame(minWidth: 290, maxWidth: .infinity, maxHeight: .infinity) }
-                    }
-                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    DocumentWorkspace(session: session)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
                 }
                 Divider()
                 statusBar
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // The inspector belongs to the document detail, not to the outer
-            // navigation split. Each sidebar then gets its own sizing boundary.
             .inspector(isPresented: $session.showInspector) {
                 ProjectInspector(session: session)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

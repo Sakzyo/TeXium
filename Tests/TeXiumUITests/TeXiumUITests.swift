@@ -1,6 +1,52 @@
 import XCTest
 
 final class TeXiumUITests: XCTestCase {
+    @MainActor func testCompiledWorkspaceRestoresAfterRelaunch() throws {
+        continueAfterFailure = false
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("TeXium-Restore-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try "\\documentclass{article}\n\\begin{document}\n\\section{Restored workspace}\nStartup verification.\n\\end{document}\n".write(to: root.appendingPathComponent("main.tex"), atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let app = XCUIApplication()
+        app.launchArguments = ["--project", root.path, "-ApplePersistenceIgnoreState", "YES"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.textViews["source-editor"].firstMatch.waitForExistence(timeout: 15))
+        app.buttons["Compile"].firstMatch.click()
+        expectation(for: NSPredicate(format: "label BEGINSWITH 'Typeset in' OR value BEGINSWITH 'Typeset in'"), evaluatedWith: app.staticTexts["build-status"].firstMatch)
+        waitForExpectations(timeout: 45)
+
+        // Exercise real AppKit termination and restoration, including a saved
+        // PDF and changing from a compact source window back to four panes.
+        for compact in [false, true] {
+            if compact {
+                app.radioButtons["chevron.left.forwardslash.chevron.right"].click()
+                app.buttons["Toggle Inspector"].click()
+                app.typeKey("s", modifierFlags: [.command, .control])
+                let window = app.windows.firstMatch
+                window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -2, dy: -2))
+                    .press(forDuration: 0.2, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.8)))
+            }
+            app.typeKey("q", modifierFlags: [.command])
+            XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+            app.launchArguments = ["-ApplePersistenceIgnoreState", "NO"]
+            app.launch()
+            XCTAssertTrue(app.textViews["source-editor"].firstMatch.waitForExistence(timeout: 15))
+            XCTAssertTrue((app.textViews["source-editor"].firstMatch.value as? String)?.contains("Startup verification") == true)
+            app.radioButtons["rectangle.split.2x1"].click()
+            if app.buttons["Show Sidebar"].exists { app.buttons["Show Sidebar"].click() }
+            if !app.descendants(matching: .any)["project-inspector-picker"].exists { app.buttons["Toggle Inspector"].click() }
+            XCTAssertTrue(app.textFields["Find in PDF"].firstMatch.waitForExistence(timeout: 10))
+            // Startup previously crashed after the one-second launch probe.
+            // Keep interacting after the PDF and inspector have been laid out.
+            for _ in 0..<3 {
+                app.buttons["Toggle Inspector"].click()
+                app.buttons["Toggle Inspector"].click()
+                assertWorkspaceFits(app, compiled: true)
+            }
+        }
+    }
+
     @MainActor func testUncompiledWorkspaceWithBothSidebars() throws {
         continueAfterFailure = false
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("TeXium-Layout-" + UUID().uuidString)
@@ -33,7 +79,7 @@ final class TeXiumUITests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(".texium-build/preview/main.pdf").path))
     }
 
-    @MainActor private func assertWorkspaceFits(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+    @MainActor private func assertWorkspaceFits(_ app: XCUIApplication, compiled: Bool = false, file: StaticString = #filePath, line: UInt = #line) {
         let window = app.windows.firstMatch
         let viewport = app.scrollViews.containing(.textView, identifier: "source-editor").firstMatch
         let inspector = app.descendants(matching: .any)["project-inspector-picker"].firstMatch
@@ -51,12 +97,14 @@ final class TeXiumUITests: XCTestCase {
         // AX groups report the union of accessible children, not blank canvas.
         // Check the preview header and centered empty-state action instead.
         XCTAssertLessThan(abs(preview.frame.minY - viewport.frame.minY), 50, file: file, line: line)
-        let emptyAction = app.buttons["Compile Project"].firstMatch.frame
-        XCTAssertGreaterThan(emptyAction.midY, viewport.frame.minY + viewport.frame.height * 0.4, file: file, line: line)
-        XCTAssertLessThan(emptyAction.midY, viewport.frame.minY + viewport.frame.height * 0.7, file: file, line: line)
         XCTAssertLessThanOrEqual(viewport.frame.maxX, preview.frame.minX + 2, file: file, line: line)
         XCTAssertLessThanOrEqual(preview.frame.maxX, inspector.frame.minX + 2, file: file, line: line)
-        XCTAssertGreaterThan(app.buttons["Compile Project"].firstMatch.frame.midX, viewport.frame.maxX, file: file, line: line)
+        if !compiled {
+            let emptyAction = app.buttons["Compile Project"].firstMatch.frame
+            XCTAssertGreaterThan(emptyAction.midY, viewport.frame.minY + viewport.frame.height * 0.4, file: file, line: line)
+            XCTAssertLessThan(emptyAction.midY, viewport.frame.minY + viewport.frame.height * 0.7, file: file, line: line)
+            XCTAssertGreaterThan(emptyAction.midX, viewport.frame.maxX, file: file, line: line)
+        }
     }
 
     @MainActor func testLocalAuthoringWorkflow() throws {

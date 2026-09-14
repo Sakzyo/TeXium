@@ -36,7 +36,7 @@ TeX discovery checks a configured directory, `/Library/TeX/texbin`, common Homeb
 This is also the configured Codex **Run** action. Release builds also create `dist/TeXium-macOS.zip` from a clean staging bundle. It builds the Xcode app, copies it to `dist/TeXium.app`, verifies its signature, and launches it. A running TeXium is asked to save and quit normally; a save conflict stops relaunch rather than discarding edits.
 
 ```sh
-./script/build_and_run.sh --verify      # Build, launch, verify process
+./script/build_and_run.sh --verify      # Build, launch, watch startup/restoration for 10 seconds
 ./script/build_and_run.sh --build-only  # Build without closing editor windows
 ./script/build_and_run.sh --debug       # Run under LLDB
 ./script/build_and_run.sh --telemetry   # Local OSLog build events

@@ -42,7 +42,7 @@ Forward navigation invokes `synctex view`; inverse navigation invokes `synctex e
 
 ## Workspace layout
 
-The navigator belongs to `NavigationSplitView`; the inspector is attached to the document detail inside that split. A `GeometryReader` gives the nested source/PDF `HSplitView` an explicit available rectangle, preventing the AppKit-backed split's fitting size from expanding the surrounding SwiftUI splits. The minimum window width accounts for the visible document modes and sidebars.
+The navigator belongs to `NavigationSplitView`; the inspector is attached to the document detail inside that split. A `GeometryReader` supplies the available rectangle to `DocumentWorkspace`, a small `NSViewRepresentable` hosting the native source/PDF `HSplitView`. Its hosting view disables inherited safe-area regions and intrinsic sizing; `sizeThatFits` answers from the proposed rectangle without measuring the nested AppKit split. This prevents the inspector's inset from conflicting with the document split's trailing-edge constraints and feeding recursive constraint updates back into the window during restoration. The hosted panes observe the same window session directly. The minimum window width accounts for the visible document modes and sidebars.
 
 The editor tab strip stays 37 points tall. The editor, empty PDF state, and loaded PDF canvas all fill the remaining height, so opening an uncompiled project has the same pane geometry as opening a compiled one. PDF page navigation uses compact icon controls to fit narrow panes. Accessibility identifiers mark the navigator, inspector picker, and PDF pane for geometry regression checks.
 

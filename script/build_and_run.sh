@@ -45,6 +45,23 @@ case "$MODE" in
     --debug|debug) lldb -- "$APP_BUNDLE/Contents/MacOS/$APP_NAME" ;;
     --logs|logs) /usr/bin/open -n "$APP_BUNDLE"; /usr/bin/log stream --info --style compact --predicate "process == \"$APP_NAME\"" ;;
     --telemetry|telemetry) /usr/bin/open -n "$APP_BUNDLE"; /usr/bin/log stream --info --style compact --predicate "subsystem == \"$BUNDLE_ID\"" ;;
-    --verify|verify) /usr/bin/open -n "$APP_BUNDLE"; sleep 1; pgrep -x "$APP_NAME" >/dev/null; echo "TeXium launched successfully." ;;
+    --verify|verify)
+        # Track this launch, not any other TeXium process. AppKit restoration
+        # can fail several seconds after open(1) has returned successfully.
+        /usr/bin/open -n -W "$APP_BUNDLE" &
+        LAUNCH_WAITER=$!
+        for _ in {1..50}; do
+            sleep 0.2
+            if ! kill -0 "$LAUNCH_WAITER" 2>/dev/null; then
+                wait "$LAUNCH_WAITER" || true
+                echo "TeXium exited during the 10-second startup/restoration check." >&2
+                exit 1
+            fi
+        done
+        # Stop only open's waiter; leave the verified app running.
+        kill "$LAUNCH_WAITER" 2>/dev/null || true
+        wait "$LAUNCH_WAITER" 2>/dev/null || true
+        echo "TeXium remained running through the 10-second startup/restoration check."
+        ;;
     *) /usr/bin/open -n "$APP_BUNDLE" ;;
 esac

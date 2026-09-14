@@ -9,7 +9,8 @@ Validation date: 2026-09-14. Host: Apple silicon, macOS 26.5.2, Xcode 26.6, Swif
 | Swift package suite | 41 tests, zero failures, zero skips on this host |
 | Offline suite | The same 41 tests passed with network access denied to the runner and descendants |
 | Native Xcode Debug application | Built and launched |
-| Xcode UI tests | Both tests passed in targeted runs: authoring workflow and workspace layout |
+| Xcode Release UI tests | Three tests passed together: compiled-project restoration, authoring workflow, and uncompiled workspace layout |
+| Release startup/restoration | Existing saved window state remained running through the extended 10-second launch check; no matching layout-constraint errors |
 | Release application | Builds for arm64 and x86_64 |
 | Clean Release ZIP | Extracted into a fresh temporary directory; `codesign --verify --deep --strict` passed |
 | Embedded dependencies | Only Apple frameworks and system Swift/runtime libraries; no embedded web runtime or third-party frameworks |
@@ -41,9 +42,13 @@ This denied network access to the tests and TeX processes without disconnecting 
 
 The bundled Research sample was opened in a separate verification application identity. Its native project navigator, NSTextView source, syntax coloring, line numbers, tab switching, PDFKit output, outline selection, source-to-PDF navigation, compile shortcut, full-screen layout, PDF zoom menu, project search, Settings, and tool discovery were exercised. Search returned four occurrences of “Knuth” across two sample files. Editing and native undo were also checked against the bundled sample during development.
 
-The UI test source covers launch, sample opening, compilation/PDF creation, editing/saving/undo, search, inspector toggling, and Settings. Both native UI tests passed in targeted runs in this graphical session, including actual compilation, editing/saving/undo, four search matches across two files, and Settings. The separate identifier prevents tests from loading ordinary TeXium recents.
+The UI test source covers launch, sample opening, compilation/PDF creation, editing/saving/undo, search, inspector toggling, Settings, and saved-window restoration. All three native UI tests passed together in Release (141.254 seconds, zero failures), including actual compilation, editing/saving/undo, four search matches across two files, and Settings. Result bundle: `.build/UI-20260914-095253.xcresult`. The separate identifier prevents tests from loading ordinary TeXium recents.
 
 The workspace layout regression opens a new uncompiled project, repeatedly hides/restores both sidebars, and shrinks the window. It asserts source viewport height, preview header/action alignment, and non-overlapping visible pane bounds. This test passed. Manual checks also verified all four sidebar combinations, the first compilation transition, and full screen. [Uncompiled workspace with both sidebars](screenshots/layout-uncompiled.jpg).
+
+The reported launch crash occurred about 2.5 seconds after launch, during recursive AppKit constraint updates. Baseline tests reproduced the conflicting inspector-inset and native split-edge constraints even when the process recovered. `DocumentWorkspace` isolates the source/PDF split's safe areas and size measurement. After the fix, the Release app launched with its existing saved window state, and the original constraint-conflict/recursion messages were absent during launch and the final UI tests. The new regression compiles a disposable project, quits normally, restores both a full workspace and a compact source window, and checks pane bounds after repeated inspector toggles. Manual checks verified native divider dragging, PDF-only/combined layout switching, and full screen. [Verified compiled workspace](screenshots/layout-restored.jpg).
+
+The launch script now watches the specific newly launched instance for ten seconds, catching delayed exits that its previous one-second process-name check missed. The rebuilt universal Release ZIP was extracted into a fresh temporary directory and passed strict signature verification.
 
 ## GitHub synchronization verification
 
