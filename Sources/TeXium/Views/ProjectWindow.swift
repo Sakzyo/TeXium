@@ -87,6 +87,10 @@ struct ProjectWindow: View {
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .navigation) {
             Button { session.building ? session.stopBuild() : session.compile() } label: { Label(session.building ? "Stop Compilation" : "Compile", systemImage: session.building ? "stop.fill" : "play.fill") }.help(session.building ? "Stop compilation" : "Compile (⌘R)")
+            Button("Download PDF", systemImage: "arrow.down.to.line") { session.exportPDF() }
+                .disabled(session.pdfURL == nil)
+                .help(session.pdfURL == nil ? "Compile the project to download its PDF" : "Save a copy of the last successfully compiled PDF")
+                .accessibilityIdentifier("download-pdf")
             Picker("Compiler", selection: $session.configuration.engine) { ForEach(TeXEngine.allCases) { Text($0.title).tag($0) } }.pickerStyle(.menu).frame(width: 110).disabled(session.building)
         }
         ToolbarItem(placement: .principal) {

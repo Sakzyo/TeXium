@@ -56,7 +56,7 @@ Build products use a temporary DerivedData directory to avoid Finder metadata on
 2. Select `main.tex`, then press **⌘R**. The sample produces two pages with an included chapter, a figure, table, equation, references, and bibliography.
 3. Select an outline heading to navigate the source. Press **⌘⇧J** to show it in the PDF. Command-click the PDF, or use **Show Source Here** in its context menu, to navigate back.
 4. Use the inspector to browse Problems, Log, References, History, Git, Notes, and Statistics.
-5. Export a PDF or source archive from the File menu.
+5. Click **Download PDF** beside **Compile** to save the compiled PDF. PDF and source archive exports are also available from the File menu.
 
 | Shortcut | Action |
 | --- | --- |

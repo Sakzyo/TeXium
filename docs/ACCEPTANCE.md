@@ -79,6 +79,10 @@ Manual checks in a disposable project verified the visible label list with secti
 
 Completion uses local source analysis rather than a TeX interpreter or online language service. Full IME/VoiceOver coverage, unusual macro/category-code conventions, and large-document performance remain part of release qualification. See [completion behavior and shortcuts](COMPLETION.md).
 
+## PDF download verification
+
+The Download PDF toolbar button was checked in the isolated verification app with a disposable project: it appears immediately beside Compile, is disabled before the first PDF exists, and becomes enabled after successful compilation. It opens the existing native PDF save dialog. The saved PDF matched the compiled preview byte for byte. Native Debug and universal Release builds passed.
+
 ## Required before public release
 
 - Expand the automated UI suite for template creation, error navigation, all insertion assistants, and native PDF/source export dialogs.
