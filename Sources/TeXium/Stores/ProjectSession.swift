@@ -14,7 +14,7 @@ import TeXiumCore
 }
 struct EditorInsertion: Equatable { let id = UUID(); let before: String; let after: String }
 enum WorkspaceSheet: String, Identifiable {
-    case newFile, newFolder, rename, symbols, equation, figure, table, export, search, goToLine, snapshot, note, pasteBib, customBuild
+    case newFile, newFolder, rename, symbols, equation, figure, table, export, search, goToLine, snapshot, note, pasteBib, customBuild, gitConnect, gitCommit
     var id: String { rawValue }
 }
 struct ProjectPreferences: Codable {
@@ -25,6 +25,7 @@ struct ProjectPreferences: Codable {
     var openTabs: [String]?
     var pdfPage: Int?
     var pdfScale: Double?
+    var preferredGitRemote: String?
 }
 @MainActor @Observable final class ProjectSession {
     static let openSessions = NSHashTable<ProjectSession>.weakObjects()
@@ -71,6 +72,14 @@ struct ProjectPreferences: Codable {
     var gitFiles: [GitFile] = []
     var gitBranch = ""
     var isGitRepository = false
+    var gitState: GitRepositoryState?
+    var preferredGitRemote: String?
+    var gitTask: Task<Void, Never>?
+    var gitMessage = ""
+    var gitLog = ""
+    var gitFailed = false
+    var gitLastFetched: Date?
+    var gitRefreshID = UUID()
     var historyDiff = ""
     var conflictPath: String?
     var recoveryAvailable: [String: String] = [:]
@@ -112,7 +121,7 @@ struct ProjectPreferences: Codable {
             }.value
             nodes = tree
             if let prefs {
-                configuration = prefs.build; notes = prefs.notes
+                configuration = prefs.build; notes = prefs.notes; preferredGitRemote = prefs.preferredGitRemote
                 savedPDFPage = prefs.pdfPage ?? 1; savedPDFScale = prefs.pdfScale ?? 0
                 for path in prefs.openTabs ?? [] where FileManager.default.fileExists(atPath: root.appendingPathComponent(path).path) { await select(path) }
             }
@@ -149,7 +158,7 @@ struct ProjectPreferences: Codable {
         writeRecovery()
         autosaveTask?.cancel()
         autosaveTask = Task { [weak self] in
-            do { try await Task.sleep(for: .milliseconds(800)); try await self?.saveAll(); await self?.refreshIndex() }
+            do { try await Task.sleep(for: .milliseconds(800)); try await self?.saveAll(); await self?.refreshIndex(); await self?.refreshGit() }
             catch is CancellationError {} catch { self?.present(error) }
         }
         if configuration.automatic { scheduleAutomaticBuild() }
@@ -190,7 +199,7 @@ struct ProjectPreferences: Codable {
         writeRecovery(); persistPreferences()
     }
     func persistPreferences() {
-        let preferences = ProjectPreferences(build: configuration, selected: selected, notes: notes, cursor: currentBuffer?.selection.location ?? 0, openTabs: tabs, pdfPage: savedPDFPage, pdfScale: savedPDFScale)
+        let preferences = ProjectPreferences(build: configuration, selected: selected, notes: notes, cursor: currentBuffer?.selection.location ?? 0, openTabs: tabs, pdfPage: savedPDFPage, pdfScale: savedPDFScale, preferredGitRemote: preferredGitRemote)
         do { try JSONEncoder().encode(preferences).write(to: metadata.appendingPathComponent("project.json"), options: .atomic) }
         catch { notice = "Project preferences could not be saved: " + error.localizedDescription }
     }
@@ -239,7 +248,7 @@ struct ProjectPreferences: Codable {
             if buffer.dirty { buffer.external = external; conflictPath = path }
             else { buffer.file = external; buffer.text = external.text; sourceGeneration += 1; stalePDF = pdfURL != nil }
         }
-        await refreshIndex()
+        await refreshIndex(); await refreshGit()
     }
     func resolveConflict(useDisk: Bool) async {
         guard let path = conflictPath, let buffer = buffers[path] else { return }
@@ -280,13 +289,9 @@ struct ProjectPreferences: Codable {
     func snapshot(_ label: String) async {
         do { try await saveAll(); _ = try await history.snapshot(label: label); await refreshHistory() } catch { present(error) }
     }
-    func refreshGit() async {
-        do { gitFiles = try await GitService.status(root: root); gitBranch = try await GitService.run(["branch", "--show-current"], root: root).trimmingCharacters(in: .whitespacesAndNewlines); isGitRepository = true }
-        catch { isGitRepository = false; gitFiles = []; gitBranch = "" }
-    }
     func shutdown() {
         Self.openSessions.remove(self)
-        stopBuild(); autosaveTask?.cancel(); automaticBuildTask?.cancel(); monitor?.stop(); monitor = nil
+        gitTask?.cancel(); stopBuild(); autosaveTask?.cancel(); automaticBuildTask?.cancel(); monitor?.stop(); monitor = nil
         if scopedAccess { root.stopAccessingSecurityScopedResource(); scopedAccess = false }
     }
 }

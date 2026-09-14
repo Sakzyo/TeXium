@@ -46,6 +46,8 @@ Forward navigation invokes `synctex view`; inverse navigation invokes `synctex e
 
 `BibTeXParser` handles braced/quoted values, nesting, concatenation, and ordinary entry fields without rewriting `.bib` source. The reference browser uses parsed values while actual bibliography production belongs to BibTeX/Biber through latexmk.
 
-`GitService` uses the installed Git and refuses a project that is merely a subdirectory of another repository. Branch switching requires a clean worktree. Pull is fast-forward only. Git credential helpers remain responsible for credentials; TeXium does not collect or persist tokens.
+`GitService` uses installed Git for repository inspection, cloning, connection, staging, commits, and branch switching. It rejects project subdirectories of a larger repository. `GitSynchronizationService` fetches and checks incoming/outgoing history, permits only clean fast-forward integration and normal pushes, and refuses conflicts/divergence. `ProjectGitActions` coordinates snapshots, editor/build exclusion, cancellation, and buffer reload. The native Git inspector, connection/commit sheets, and Project menu expose these operations.
+
+`GitHubCredentialStore` keeps optional HTTPS tokens in app-specific macOS Keychain items. The executable entry point routes `--git-credential get` to a headless, host-validated credential protocol before SwiftUI startup. Git receives the credential through its helper pipe; tokens never enter command arguments or project configuration. SSH and external credential helpers remain available. See [GitHub synchronization](GITHUB.md).
 
 `ArchiveService` validates ZIP structure before extraction into a temporary directory, then copies into a new destination. Source exports filter hidden and auxiliary files. Submission exports add generated `.bbl` files. The template library writes normal `.tex` and `.bib` files and requires a new folder.

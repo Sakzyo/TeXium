@@ -82,7 +82,7 @@ struct ProjectBrowser: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Clone a Git Repository").font(.title2)
                 TextField("Repository URL", text: $cloneURL).frame(width: 440)
-                Text("Uses your installed Git and configured credentials.").font(.caption).foregroundStyle(.secondary)
+                Text("For HTTPS GitHub access, add a token in Settings → GitHub. SSH uses your configured keys.").font(.caption).foregroundStyle(.secondary)
                 HStack { Spacer(); Button("Cancel") { cloning = false }; Button("Choose Destination…") { clone() }.disabled(cloneURL.isEmpty || busy) }
             }.padding(24)
         }
@@ -126,7 +126,7 @@ struct ProjectBrowser: View {
     private func clone() {
         guard !cloneURL.hasPrefix("-"), let target = destination(title: "Clone Repository", name: "LaTeX Project") else { return }
         let remote = cloneURL; busy = true
-        Task { defer { busy = false }; do { _ = try await GitService.run(["clone", "--", remote, target.path], root: target.deletingLastPathComponent()); cloning = false; library.remember(target); openWindow(id: "project", value: target.path) } catch { library.error = error.localizedDescription } }
+        Task { defer { busy = false }; do { try await GitService.clone(remote, to: target, authentication: GitHubAuthentication.forRemote(remote)); cloning = false; library.remember(target); openWindow(id: "project", value: target.path) } catch { library.error = error.localizedDescription } }
     }
     private func duplicate(_ project: RecentProject) {
         guard let target = destination(title: "Duplicate Project", name: project.name + " Copy") else { return }

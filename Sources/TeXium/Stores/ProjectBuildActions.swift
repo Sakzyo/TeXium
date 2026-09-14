@@ -6,7 +6,7 @@ private let buildLogger = Logger(subsystem: "app.texium.mac", category: "Compila
 
 extension ProjectSession {
     func compile(scratch: Bool = false, draft: Bool = false) {
-        guard !building else { return }
+        guard !building && !operationBusy else { return }
         guard conflictPath == nil else { error = "Resolve the external file change before compiling."; return }
         guard let distribution = TeXDistribution.discover(customPath: UserDefaults.standard.string(forKey: "texPath") ?? "") else {
             error = "No local TeX installation was found. Install MacTeX or BasicTeX with latexmk, or choose your TeX binary folder in Settings → LaTeX."; return

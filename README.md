@@ -12,9 +12,10 @@ A native macOS workspace for writing, typesetting, and exploring LaTeX. Projects
 - PDFKit preview, thumbnails, search, zoom, printing, export, and bidirectional SyncTeX. Failed builds preserve the last successful PDF.
 - BibTeX browsing and citation completion; equation, table, figure, and symbol assistants; local notes and `texcount` word counts.
 - Content-addressed local snapshots, revision comparison/restoration, Git status/staging/commits/branches/remotes, ten built-in templates, validated ZIP import, and source/submission exports.
+- GitHub connection and clone, incoming/outgoing status, commit review, fast-forward synchronization, and optional HTTPS tokens in macOS Keychain. See [GitHub setup and synchronization](docs/GITHUB.md).
 - Atomic coordinated saves, external-change comparison, crash recovery copies, UTF-8/UTF-16 BOM handling, and LF/CRLF preservation.
 
-The implementation contains no browser view, application server, account system, or collaboration infrastructure. Optional Git network actions use the installed Git and its existing credential configuration.
+The implementation contains no browser view, application server, account system, or collaboration infrastructure. Optional Git network actions use installed Git with SSH, existing credential helpers, or a token stored in Keychain through Settings → GitHub.
 
 ## Requirements
 
@@ -61,6 +62,7 @@ Build products use a temporary DerivedData directory to avoid Finder metadata on
 | ⌘R | Compile |
 | ⌘F / ⌥⌘F | Native file find / Project search |
 | ⌘⇧J | Source → PDF |
+| ⇧⌘U | Synchronize the selected repository |
 | Escape | Native context completion |
 | ⌘/ | Comment / uncomment |
 | ⌘B / ⌘I | Bold / italic |
@@ -74,7 +76,7 @@ Build products use a temporary DerivedData directory to avoid Finder metadata on
 ./script/test_ui.sh
 ```
 
-The core suite covers parser offsets, encodings, conflicts, traversal/symlinks, history integrity, search/replace, archive validation, Git, process cancellation, actual bibliography builds, all four engines, every bundled template, PDF output, and bidirectional SyncTeX. TeX-dependent tests report skips when required tools are absent; inspect the report rather than interpreting a skip as a pass.
+The suite includes an isolated synthetic Keychain round-trip and requires a logged-in macOS session with Keychain access. The core suite covers parser offsets, encodings, conflicts, traversal/symlinks, history integrity, search/replace, archive validation, Git, process cancellation, actual bibliography builds, all four engines, every bundled template, PDF output, and bidirectional SyncTeX. TeX-dependent tests report skips when required tools are absent; inspect the report rather than interpreting a skip as a pass.
 
 UI tests use the separate bundle identifier `app.texium.verification` and a disposable fixture copy. They require a logged-in graphical session with Xcode UI automation enabled. `TEST_ACTION=build-for-testing ./script/test_ui.sh` checks that the runner and app build without requesting UI execution.
 
@@ -92,7 +94,7 @@ Read [architecture](docs/ARCHITECTURE.md), [security and file integrity](docs/SE
 
 This is a working **0.1 developer release**, not a notarized public release. Local builds are ad-hoc signed. A Developer ID certificate, release acceptance testing, and Apple's notarization service are still required for distribution.
 
-- No optional visual editor, AI provider, online reference lookup, cloud synchronization, or updater is included.
+- No optional visual editor, AI provider, online reference lookup, general-purpose cloud folder synchronization, or updater is included.
 - No code folding, multiple cursors, or Vim/Emacs modes. Completion uses a built-in command vocabulary plus project keys and filenames; it does not interpret arbitrary package definitions.
 - Outline, diagnostics, and bibliography parsers are practical source parsers, not a TeX interpreter. BibTeX string macros are preserved but not fully expanded in the browser.
 - TeX's arbitrary source execution is not an OS security sandbox. Only compile trusted projects; see the security document. Project `.latexmkrc` files are deliberately ignored. Index/glossary recipes requiring custom rules need an explicitly configured custom build command.

@@ -21,6 +21,7 @@ struct WindowLifecycle: NSViewRepresentable {
         weak var previous: NSWindowDelegate?
         init(_ session: ProjectSession) { self.session = session }
         func windowShouldClose(_ sender: NSWindow) -> Bool {
+            guard session.gitTask == nil else { session.error = "Wait for Git to finish, or stop it in the Git inspector, before closing this project."; return false }
             do { try session.saveAllSynchronously(); return previous?.windowShouldClose?(sender) ?? true }
             catch { session.present(error); return false }
         }

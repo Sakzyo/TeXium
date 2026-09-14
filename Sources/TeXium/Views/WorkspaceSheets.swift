@@ -12,6 +12,8 @@ struct WorkspaceSheets: View {
     @State private var busy = false
     var body: some View {
         switch sheet {
+        case .gitConnect: GitHubConnectionSheet(session: session)
+        case .gitCommit: GitCommitSheet(session: session)
         case .symbols: SymbolPalette(session: session)
         case .equation: EquationAssistant(session: session)
         case .figure: FigureAssistant(session: session)
@@ -132,7 +134,7 @@ struct CustomBuildSheet: View {
             TextField("Absolute executable path", text: $executable)
             TextField("Arguments as a JSON array", text: $arguments)
             Text("The executable runs in the project folder with your account’s permissions. Arguments are passed directly, without a shell. Output appears in the Build Log.").font(.callout).foregroundStyle(.secondary)
-            HStack { Spacer(); Button("Cancel") { session.sheet = nil }; Button("Review and Run…") { approval = true }.disabled(executable.isEmpty || session.building) }
+            HStack { Spacer(); Button("Cancel") { session.sheet = nil }; Button("Review and Run…") { approval = true }.disabled(executable.isEmpty || session.building || session.operationBusy) }
         }.padding(24).frame(width: 600)
         .alert("Run This Executable?", isPresented: $approval) {
             Button("Cancel", role: .cancel) {}

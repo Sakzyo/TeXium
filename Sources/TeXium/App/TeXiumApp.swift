@@ -2,6 +2,14 @@ import SwiftUI
 import AppKit
 
 @main
+enum TeXiumEntryPoint {
+    @MainActor static func main() {
+        if CommandLine.arguments.dropFirst().first == "--git-credential" {
+            GitHubAuthentication.serveCredentialRequest()
+        } else { TeXiumApp.main() }
+    }
+}
+
 struct TeXiumApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var library = ProjectLibrary()
@@ -33,6 +41,11 @@ struct TeXiumApp: App {
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         for session in ProjectSession.openSessions.allObjects {
+            if session.gitTask != nil {
+                let alert = NSAlert(); alert.messageText = "A Git operation is still running"
+                alert.informativeText = "Let synchronization finish, or cancel it in the Git inspector, before quitting. A push may already have reached the server."
+                alert.addButton(withTitle: "Keep TeXium Open"); alert.runModal(); return .terminateCancel
+            }
             do { try session.saveAllSynchronously() }
             catch {
                 let alert = NSAlert(); alert.messageText = "Your edits need attention before quitting"

@@ -52,6 +52,7 @@ struct SettingsView: View {
                 Toggle("Show thumbnails by default", isOn: $thumbnails)
                 Text("Command-click a PDF location to jump to its source. Use Navigate → Show in PDF for the other direction.").foregroundStyle(.secondary)
             }.tabItem { Label("PDF", systemImage: "doc.richtext") }
+            GitHubSettings().tabItem { Label("GitHub", systemImage: "arrow.triangle.branch") }
         }.formStyle(.grouped).padding(16).frame(width: 570, height: 510)
     }
     private func testTools() {

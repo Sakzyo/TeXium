@@ -6,8 +6,8 @@ Validation date: 2026-09-14. Host: Apple silicon, macOS 26.5.2, Xcode 26.6, Swif
 
 | Check | Result |
 | --- | --- |
-| Swift package suite | 31 tests, zero failures, zero skips on this host |
-| Offline suite | The same 31 tests passed with network access denied to the runner and descendants |
+| Swift package suite | 41 tests, zero failures, zero skips on this host |
+| Offline suite | The same 41 tests passed with network access denied to the runner and descendants |
 | Native Xcode Debug application | Built and launched |
 | Xcode UI test target | Builds successfully; execution blocked by macOS automation initialization timeout |
 | Release application | Builds for arm64 and x86_64 |
@@ -22,7 +22,8 @@ The core tests include:
 - History object deduplication, corruption detection, file diff, restore with retained newer history, and automatic snapshot behavior.
 - Regex/Unicode search, replacement preview baselines, and preservation of external modifications.
 - ZIP round trip, export filtering, malformed archive and symbolic-link rejection.
-- Git status/staging, dirty branch-switch rejection, and refusal to initialize a nested repository.
+- Git status/staging, initial publication, two-writer fetch/pull/push, differently named upstream branches, dirty-worktree and divergence preservation, conflicts/detached HEAD, deleted remote branches, rejecting server hooks, destination mismatch, and refusal to initialize a nested repository.
+- GitHub URL validation, credential-protocol host/account isolation, synthetic Keychain save/update/read/removal in a unique test service, and a headless credential-helper smoke check against an unrelated host. No real token was read or written.
 - Large subprocess output drainage, cancellation before launch, and cancellation of descendant processes.
 - A real two-page document in a folder with spaces, with a chapter, image, equation, table, contents, bibliography, resolved references, and forward/inverse SyncTeX.
 - Rejection of executable project `.latexmkrc` content and preservation of previous PDF bytes after a failed scratch compile.
@@ -41,6 +42,14 @@ This denied network access to the tests and TeX processes without disconnecting 
 The bundled Research sample was opened in a separate verification application identity. Its native project navigator, NSTextView source, syntax coloring, line numbers, tab switching, PDFKit output, outline selection, source-to-PDF navigation, compile shortcut, full-screen layout, PDF zoom menu, project search, Settings, and tool discovery were exercised. Search returned four occurrences of “Knuth” across two sample files. Editing and native undo were also checked against the bundled sample during development.
 
 The UI test source covers launch, sample opening, compilation/PDF creation, editing/saving/undo, search, inspector toggling, and Settings. Xcode's runner reported **“Timed out while enabling automation mode”**, before the test body executed. Do not report it as a passing UI test. Run `./script/test_ui.sh` in an Xcode-enabled graphical login session to complete that qualification. The separate identifier prevents tests from loading ordinary TeXium recents.
+
+## GitHub synchronization verification
+
+The separate verification app exercised **Project → GitHub Synchronization**, the native commit review sheet with author identity, **Commit & Sync**, and a subsequent **Synchronize** that pulled a second writer's commit. Both repositories and the bare remote were disposable local fixtures. The inspector showed zero incoming/outgoing commits after success, and the open source buffer reloaded the incoming revision. The GitHub Settings tab was inspected, including its SecureField and Keychain controls. [Settings screenshot](screenshots/github-settings.jpg).
+
+No real GitHub repository was pushed or changed during verification. Authenticated HTTPS/SSH operations against GitHub, expired/organization-restricted tokens, and Developer ID Keychain behavior across app updates still require account-based release qualification. The Keychain test requires a logged-in macOS session with Keychain access; a restricted tool sandbox returned a Keychain parameter error, while the normal macOS process passed save/update/read/removal. The final offline suite ran with normal filesystem/Keychain access and network access denied.
+
+The universal Release ZIP was rebuilt with the feature, extracted outside the Documents file provider, and passed strict signature verification. The Release executable's credential-helper mode exited without opening SwiftUI or returning a credential for an unrelated host.
 
 ## Required before public release
 

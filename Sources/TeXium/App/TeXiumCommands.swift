@@ -69,6 +69,10 @@ struct TeXiumCommands: Commands {
             Divider()
             Button("Take Snapshot…") { session?.sheet = .snapshot }.keyboardShortcut("s", modifiers: [.command, .option]).disabled(session == nil)
             Button("Show History") { session?.inspectorTab = "History"; session?.showInspector = true }.disabled(session == nil)
+            Button("GitHub Synchronization") { session?.showGit() }.disabled(session == nil)
+            Button("Connect GitHub Repository…") { session?.sheet = .gitConnect }.disabled(session == nil || session?.operationBusy == true)
+            Button("Synchronize Repository") { session?.synchronizeGit(.synchronize) }.keyboardShortcut("u", modifiers: [.command, .shift]).disabled(session?.gitState?.remote == nil || session?.operationBusy == true || session?.building == true)
+            Button("Open on GitHub") { if let url = session?.gitState?.remote?.github?.webURL { NSWorkspace.shared.open(url) } }.disabled(session?.gitState?.remote?.github == nil)
             Button("Add Personal Note…") { session?.sheet = .note }.disabled(session == nil)
             Button("Word Count") { session?.countWords() }.disabled(session == nil)
         }
