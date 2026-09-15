@@ -57,7 +57,7 @@ The launch script now watches the specific newly launched instance for ten secon
 
 The separate verification app exercised **Project → GitHub Synchronization**, the native commit review sheet with author identity, **Commit & Sync**, and a subsequent **Synchronize** that pulled a second writer's commit. Both repositories and the bare remote were disposable local fixtures. The inspector showed zero incoming/outgoing commits after success, and the open source buffer reloaded the incoming revision. The GitHub Settings tab was inspected, including its SecureField and Keychain controls. [Settings screenshot](screenshots/github-settings.jpg).
 
-No real GitHub repository was pushed or changed during verification. Authenticated HTTPS/SSH operations against GitHub, expired/organization-restricted tokens, and Developer ID Keychain behavior across app updates still require account-based release qualification. The Keychain test requires a logged-in macOS session with Keychain access; a restricted tool sandbox returned a Keychain parameter error, while the normal macOS process passed save/update/read/removal. The final offline suite ran with normal filesystem/Keychain access and network access denied.
+The in-app synchronization verification used disposable local repositories; it did not exercise authenticated GitHub synchronization. Repository changes and release assets were later pushed with the GitHub CLI. Authenticated HTTPS/SSH operations from TeXium, expired/organization-restricted tokens, and Developer ID Keychain behavior across app updates still require account-based release qualification. The Keychain test requires a logged-in macOS session with Keychain access; a restricted tool sandbox returned a Keychain parameter error, while the normal macOS process passed save/update/read/removal. The final offline suite ran with normal filesystem/Keychain access and network access denied.
 
 The universal Release ZIP was rebuilt with the feature, extracted outside the Documents file provider, and passed strict signature verification. The Release executable's credential-helper mode exited without opening SwiftUI or returning a credential for an unrelated host.
 
@@ -99,7 +99,7 @@ The successful native screenshot was inspected for complete structures and inden
 - Validate older supported macOS versions, Intel execution, large projects/bibliographies/PDFs, external drives, moved folders, and disk-full recovery.
 - Stress concurrent external editing, interrupted saves/restores, compiler cancellation under varied process trees, and crash recovery.
 - Verify per-document undo expectations when switching source tabs; current undo is native within the active view and resets when switching files.
-- Perform Developer ID signing, notarization, stapling, and clean-machine Gatekeeper acceptance. No public distribution has been performed.
+- Perform Developer ID signing, notarization, stapling, and clean-machine Gatekeeper acceptance. The public 1.0.0 developer build does not satisfy this requirement.
 
 ## Packaging note
 

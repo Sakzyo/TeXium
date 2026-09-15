@@ -65,7 +65,7 @@ This builds in a temporary directory, checks the Developer ID authority, Team ID
 
 Only submit with a valid identity and profile. Investigate any rejected notarization log; do not disable Gatekeeper or strip quarantine as a release procedure. Validate the published download on another account or machine.
 
-The current GitHub 1.0.0 release remains a draft until this pipeline completes. Run the pending checks in `ACCEPTANCE.md` before calling it a public production release.
+TeXium 1.0.0 was published as an explicitly requested developer build without Developer ID signing or notarization. Gatekeeper rejects that artifact. Use this pipeline and run the pending checks in `ACCEPTANCE.md` before calling a future artifact a production release.
 
 ## Assets and dependencies
 

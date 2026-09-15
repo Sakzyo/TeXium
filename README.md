@@ -97,7 +97,7 @@ Read [architecture](docs/ARCHITECTURE.md), [security and file integrity](docs/SE
 
 ## Release status and limits
 
-Local builds are ad-hoc signed. A Developer ID certificate, release acceptance testing, and Apple's notarization service are required for public distribution.
+Local builds are ad-hoc signed. The 1.0.0 GitHub release is an explicitly requested developer build without Developer ID signing or notarization, and Gatekeeper rejects it. A Developer ID certificate, release acceptance testing, and Apple's notarization service remain required for a production release.
 
 - No optional visual editor, AI provider, online reference lookup, general-purpose cloud folder synchronization, or updater is included.
 - No code folding, multiple cursors, or Vim/Emacs modes. Completion uses a built-in command vocabulary plus project macros, labels, headings, bibliography, and filenames; it does not interpret arbitrary package definitions.
