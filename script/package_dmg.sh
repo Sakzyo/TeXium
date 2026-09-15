@@ -2,9 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_BUNDLE="$ROOT_DIR/dist/TeXium.app"
+DIST_DIR="${TEXIUM_DIST_DIR:-$ROOT_DIR/dist}"
+APP_BUNDLE="${TEXIUM_APP_BUNDLE:-$DIST_DIR/TeXium.app}"
 VERSION="1.0.0"
-DMG="$ROOT_DIR/dist/TeXium-$VERSION.dmg"
+DMG="$DIST_DIR/TeXium-$VERSION.dmg"
 
 if [[ ! -d "$APP_BUNDLE" ]]; then
     echo "Build the Release app before packaging the DMG." >&2
@@ -26,6 +27,10 @@ if [[ "$ARCHS" != *arm64* || "$ARCHS" != *x86_64* ]]; then
     exit 1
 fi
 /usr/bin/hdiutil create -volname "TeXium $VERSION" -srcfolder "$STAGING_DIR" -format UDZO -ov "$DMG"
+if [[ -n "${TEXIUM_SIGNING_IDENTITY:-}" ]]; then
+    /usr/bin/codesign --force --timestamp --sign "$TEXIUM_SIGNING_IDENTITY" "$DMG"
+    /usr/bin/codesign --verify --verbose=2 "$DMG"
+fi
 /usr/bin/hdiutil verify "$DMG"
-(cd "$ROOT_DIR/dist" && /usr/bin/shasum -a 256 "TeXium-$VERSION.dmg" > "TeXium-$VERSION.dmg.sha256")
+(cd "$DIST_DIR" && /usr/bin/shasum -a 256 "TeXium-$VERSION.dmg" > "TeXium-$VERSION.dmg.sha256")
 echo "Created $DMG"

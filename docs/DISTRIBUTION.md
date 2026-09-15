@@ -21,6 +21,14 @@ Release enables optimization and builds arm64/x86_64. The default signature is a
 
 Use an Apple Developer team with an installed **Developer ID Application** certificate. Keep credentials and private keys in Keychain, outside the repository. Choose your organization's bundle identifier before public release and update the project generator if changing the default.
 
+A free Xcode **Personal Team** supports local testing but cannot issue Developer ID certificates or use Apple's notarization service. The signing account must belong to the [Apple Developer Program](https://developer.apple.com/support/compare-memberships/), and the account holder or an authorized team member must create the certificate.
+
+In Xcode, open **Settings → Accounts**, select the Apple Developer team, choose **Manage Certificates**, and create or import a **Developer ID Application** certificate. The certificate must include its private key in the login Keychain. Confirm the exact identity name with:
+
+```sh
+security find-identity -v -p codesigning
+```
+
 ```sh
 CONFIGURATION=Release \
 TEXIUM_SIGNING_IDENTITY='Developer ID Application: Your Organization (TEAMID)' \
@@ -34,19 +42,30 @@ An Xcode Organizer archive can also be created with the TeXium scheme and a conf
 
 ## Notarize and staple
 
-After configuring a notarytool Keychain profile yourself, package the signed Release artifact and submit it:
+Create the device-local `notarytool` profile once. The following command securely prompts for the app-specific password instead of placing it in shell history:
 
 ```sh
-ditto -c -k --keepParent --norsrc --noextattr dist/TeXium.app dist/TeXium-notary.zip
-xcrun notarytool submit dist/TeXium-notary.zip --keychain-profile TeXiumNotary --wait
-xcrun stapler staple dist/TeXium.app
-xcrun stapler validate dist/TeXium.app
-spctl --assess --type execute --verbose=2 dist/TeXium.app
+xcrun notarytool store-credentials TeXiumNotary \
+  --apple-id 'developer@example.com' \
+  --team-id 'TEAMID'
 ```
 
-Only submit with an actual configured identity/profile. Investigate any rejected notarization log; do not disable Gatekeeper or strip quarantine as a release procedure. Repackage the stapled app into the final download ZIP after acceptance, then verify the downloaded artifact on another account or machine.
+An App Store Connect API key can be stored instead by passing `--key`, `--key-id`, and, for a team key, `--issuer`. Do not commit the key or credentials.
 
-No Developer ID signing, notarization submission, credential creation, or publication was performed during implementation. The local artifact remains a developer build. Run the pending checks in `ACCEPTANCE.md` before calling it a public production release.
+Run the complete fail-closed pipeline with the exact identity and team shown by Apple:
+
+```sh
+TEXIUM_SIGNING_IDENTITY='Developer ID Application: Your Organization (TEAMID)' \
+TEXIUM_DEVELOPMENT_TEAM='TEAMID' \
+TEXIUM_NOTARY_PROFILE='TeXiumNotary' \
+./script/release_notarized.sh
+```
+
+This builds in a temporary directory, checks the Developer ID authority, Team ID, Hardened Runtime, both architectures, notarizes and staples the app, signs/notarizes/staples the DMG, and runs Gatekeeper assessments. It copies the validated DMG and checksum to `dist/` but leaves the GitHub release as a draft. Add `--publish` only when the same run should replace the draft assets, verify GitHub's uploaded digest, and publish the release.
+
+Only submit with a valid identity and profile. Investigate any rejected notarization log; do not disable Gatekeeper or strip quarantine as a release procedure. Validate the published download on another account or machine.
+
+The current GitHub 1.0.0 release remains a draft until this pipeline completes. Run the pending checks in `ACCEPTANCE.md` before calling it a public production release.
 
 ## Assets and dependencies
 
