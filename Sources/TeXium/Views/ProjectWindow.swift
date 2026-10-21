@@ -62,7 +62,7 @@ struct ProjectWindow: View {
         .alert("Recover Unsaved Edits?", isPresented: Binding(get: { !session.recoveryAvailable.isEmpty }, set: { _ in })) {
             Button("Recover Edits") { Task { await session.recoverBuffers() } }
             Button("Keep Files on Disk") { session.recoveryAvailable = [:]; session.writeRecovery() }
-        } message: { Text("Recovery copies are available for \(session.recoveryAvailable.count) source files from an earlier session.") }
+        } message: { Text("Recovery copies are available for \(session.recoveryAvailable.count.counted("source file")) from an earlier session.") }
     }
     private var minimumWindowWidth: CGFloat {
         let document: CGFloat = session.layout == "Both" ? 640 : 320
@@ -70,10 +70,26 @@ struct ProjectWindow: View {
     }
     private var statusBar: some View {
         HStack(spacing: 14) {
-            if session.building || session.operationBusy { ProgressView().controlSize(.small) }
-            Image(systemName: session.buildStatus.contains("failed") ? "exclamationmark.triangle" : "checkmark.circle").foregroundStyle(.secondary)
-            Text(session.buildStatus).lineLimit(1).accessibilityIdentifier("build-status")
-            if let start = session.buildStarted { TimelineView(.periodic(from: start, by: 1)) { _ in Text("\(Int(Date().timeIntervalSince(start)))s").monospacedDigit() } }
+            HStack(spacing: 6) {
+                // Spinner and status glyph share one slot so the text never shifts.
+                Group {
+                    if session.building || session.operationBusy { ProgressView().controlSize(.mini) }
+                    else { Image(systemName: statusSymbol.name).foregroundStyle(statusSymbol.tint) }
+                }.frame(width: 14, height: 14)
+                Text(session.buildStatus).lineLimit(1).accessibilityIdentifier("build-status")
+                if let start = session.buildStarted { TimelineView(.periodic(from: start, by: 1)) { _ in Text("\(Int(Date().timeIntervalSince(start)))s").monospacedDigit().foregroundStyle(.tertiary) } }
+            }
+            if issueCounts.errors + issueCounts.warnings > 0 {
+                Button { session.inspectorTab = "Problems"; session.showInspector = true } label: {
+                    HStack(spacing: 8) {
+                        if issueCounts.errors > 0 { Label("\(issueCounts.errors)", systemImage: "xmark.octagon.fill").foregroundStyle(.red) }
+                        if issueCounts.warnings > 0 { Label("\(issueCounts.warnings)", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange) }
+                    }.labelStyle(StatusCountLabelStyle()).monospacedDigit().contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Show Problems")
+                .accessibilityLabel("\(issueCounts.errors.counted("error")), \(issueCounts.warnings.counted("warning"))")
+            }
             Spacer()
             if let buffer = session.currentBuffer {
                 Text(buffer.dirty ? "Edited" : "Saved")
@@ -83,6 +99,20 @@ struct ProjectWindow: View {
             }
             if session.isGitRepository { Label(session.gitBranch.isEmpty ? "Git" : session.gitBranch, systemImage: "arrow.triangle.branch") }
         }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 14).frame(height: 28)
+    }
+    private var statusSymbol: (name: String, tint: AnyShapeStyle) {
+        let status = session.buildStatus
+        if status.contains("failed") || status.hasPrefix("Unable") { return ("xmark.circle.fill", AnyShapeStyle(.red)) }
+        if status.hasPrefix("Custom command exited") { return status.hasSuffix(": 0") ? ("checkmark.circle", AnyShapeStyle(.secondary)) : ("exclamationmark.triangle.fill", AnyShapeStyle(.orange)) }
+        if status.hasPrefix("Typeset in") || status.hasPrefix("Draft checked") { return ("checkmark.circle.fill", AnyShapeStyle(.green)) }
+        if status.contains("stopped") { return ("stop.circle", AnyShapeStyle(.secondary)) }
+        if status == "Ready to typeset" { return ("play.circle", AnyShapeStyle(.secondary)) }
+        return ("checkmark.circle", AnyShapeStyle(.secondary))
+    }
+    private var issueCounts: (errors: Int, warnings: Int) {
+        session.diagnostics.reduce(into: (0, 0)) { counts, diagnostic in
+            if diagnostic.severity == .error { counts.0 += 1 } else if diagnostic.severity == .warning { counts.1 += 1 }
+        }
     }
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .navigation) {
@@ -133,10 +163,12 @@ struct ProjectNavigator: View {
         .onDrop(of: [UTType.fileURL], isTargeted: nil) { session.acceptDrop($0, folder: "", move: !NSEvent.modifierFlags.contains(.option)) }
         .safeAreaInset(edge: .bottom) {
             HStack {
-                Menu { Button("New File…") { session.sheet = .newFile }; Button("New Folder…") { session.sheet = .newFolder }; Button("Import Files…") { session.importFiles() } } label: { Image(systemName: "plus") }.menuStyle(.borderlessButton).frame(width: 24)
+                Menu { Button("New File…") { session.sheet = .newFile }; Button("New Folder…") { session.sheet = .newFolder }; Button("Import Files…") { session.importFiles() } } label: { Image(systemName: "plus") }
+                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                    .help("Add a file or folder").accessibilityLabel("Add")
                 Spacer()
-                Text("\(session.files.count) files").font(.caption).foregroundStyle(.secondary)
-            }.padding(12)
+                Text(session.files.count.counted("file")).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            }.padding(.horizontal, 12).padding(.vertical, 8)
         }
     }
     @ViewBuilder private func fileMenu(_ file: ProjectFile) -> some View {
@@ -161,14 +193,7 @@ struct EditorPane: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
                         ForEach(session.tabs, id: \.self) { path in
-                            HStack(spacing: 8) {
-                                Button { Task { await session.select(path) } } label: {
-                                    HStack(spacing: 6) { Image(systemName: path.hasSuffix(".bib") ? "books.vertical" : "doc.text"); Text((path as NSString).lastPathComponent); if session.buffers[path]?.dirty == true { Text("•") } }
-                                }.buttonStyle(.plain)
-                                Button("Close File", systemImage: "xmark") { session.closeTab(path) }.labelStyle(.iconOnly).buttonStyle(.plain).font(.system(size: 9)).foregroundStyle(.secondary)
-                            }.font(.callout).padding(.horizontal, 13).frame(height: 37)
-                            .background(session.selected == path ? Color.primary.opacity(0.045) : Color.clear)
-                            .overlay(alignment: .bottom) { if session.selected == path { Rectangle().fill(Color.accentColor).frame(height: 2) } }
+                            EditorTab(session: session, path: path)
                             Divider().frame(height: 20)
                         }
                     }
@@ -199,6 +224,83 @@ struct EditorPane: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+/// Tabs switch constantly, so hover and selection change instantly — no animation.
+private struct EditorTab: View {
+    @Bindable var session: ProjectSession
+    let path: String
+    @State private var hovering = false
+    var body: some View {
+        let selected = session.selected == path
+        let dirty = session.buffers[path]?.dirty == true
+        let name = (path as NSString).lastPathComponent
+        HStack(spacing: 6) {
+            Image(systemName: path.hasSuffix(".bib") ? "books.vertical" : "doc.text").foregroundStyle(.secondary)
+            Text(name).foregroundStyle(selected ? .primary : .secondary)
+            // One slot for both close and unsaved state, like Safari and Xcode:
+            // the dot marks edits at rest, the close button takes over on hover.
+            ZStack {
+                if hovering || (selected && !dirty) {
+                    Button("Close \(name)", systemImage: "xmark") { session.closeTab(path) }
+                        .labelStyle(.iconOnly).buttonStyle(TabCloseButtonStyle())
+                        .help("Close Tab")
+                } else if dirty {
+                    Circle().fill(.secondary).frame(width: 6, height: 6)
+                }
+            }.frame(width: 16, height: 16)
+        }
+        .font(.callout)
+        .padding(.leading, 12).padding(.trailing, 7).frame(height: 37)
+        .background(selected ? Color.primary.opacity(0.05) : hovering ? Color.primary.opacity(0.03) : .clear)
+        .overlay(alignment: .bottom) { if selected { Rectangle().fill(Color.accentColor).frame(height: 2) } }
+        .contentShape(Rectangle())
+        .onTapGesture { Task { await session.select(path) } }
+        .onHover { hovering = $0 }
+        .help(path)
+        .contextMenu {
+            Button("Close Tab") { session.closeTab(path) }
+            Button("Close Other Tabs") { for other in session.tabs where other != path { session.closeTab(other) } }.disabled(session.tabs.count < 2)
+            Divider()
+            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([session.root.appendingPathComponent(path)]) }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(dirty ? "\(name), edited" : name)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { Task { await session.select(path) } }
+        .accessibilityAction(named: "Close Tab") { session.closeTab(path) }
+    }
+}
+private struct TabCloseButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { TabCloseGlyph(configuration: configuration) }
+}
+private struct TabCloseGlyph: View {
+    let configuration: ButtonStyleConfiguration
+    @State private var hovering = false
+    var body: some View {
+        configuration.label
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: 16, height: 16)
+            .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(configuration.isPressed ? 0.16 : hovering ? 0.08 : 0)))
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+    }
+}
+private struct StatusCountLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 3) { configuration.icon; configuration.title.foregroundStyle(.secondary) }
+    }
+}
+extension Animation {
+    /// Strong ease-out: responds immediately, settles softly. For occasional,
+    /// non-keyboard state changes only.
+    static let texiumEaseOut = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.2)
+}
+extension Int {
+    /// "1 file", "3 files" — avoids "1 files" in counts shown to people.
+    func counted(_ singular: String, plural: String? = nil) -> String {
+        "\(self) \(self == 1 ? singular : plural ?? singular + "s")"
     }
 }
 struct AssetPreview: View {

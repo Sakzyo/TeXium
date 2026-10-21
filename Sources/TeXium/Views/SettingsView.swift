@@ -28,24 +28,38 @@ struct SettingsView: View {
                 LabeledContent("Appearance", value: "Follows macOS")
             }.tabItem { Label("General", systemImage: "gearshape") }
             Form {
-                TextField("Font family", text: $font)
-                Slider(value: $size, in: 10...28, step: 1) { Text("Font size: \(Int(size)) pt") }
-                Stepper("Indent width: \(tabWidth)", value: $tabWidth, in: 1...8)
-                Toggle("Indent with spaces", isOn: $spaces)
-                Toggle("Line numbers", isOn: $lineNumbers)
-                Toggle("Highlight current line", isOn: $currentLine)
-                Toggle("Syntax highlighting", isOn: $highlighting)
-                Toggle("Close braces and brackets", isOn: $autoClose)
-                Toggle("Automatic code completion", isOn: $completion)
-                Text("Suggest commands, labels, citations, and headings as you type. Use ↑↓ to select, Tab or Return to insert, and Escape to dismiss. Control-Space opens suggestions; Tab moves through command arguments.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Toggle("Check spelling", isOn: $spelling)
+                Section("Font") {
+                    TextField("Font family", text: $font)
+                    // Fixed-width value so the slider track doesn't shift while dragging.
+                    LabeledContent("Font size") {
+                        HStack { Slider(value: $size, in: 10...28, step: 1).labelsHidden(); Text("\(Int(size)) pt").monospacedDigit().foregroundStyle(.secondary).frame(width: 44, alignment: .trailing) }
+                    }
+                }
+                Section("Indentation") {
+                    Stepper("Indent width: \(tabWidth)", value: $tabWidth, in: 1...8)
+                    Toggle("Indent with spaces", isOn: $spaces)
+                }
+                Section("Display") {
+                    Toggle("Line numbers", isOn: $lineNumbers)
+                    Toggle("Highlight current line", isOn: $currentLine)
+                    Toggle("Syntax highlighting", isOn: $highlighting)
+                }
+                Section {
+                    Toggle("Close braces and brackets", isOn: $autoClose)
+                    Toggle("Automatic code completion", isOn: $completion)
+                    Toggle("Check spelling", isOn: $spelling)
+                } header: { Text("Typing") } footer: {
+                    Text("Suggest commands, labels, citations, and headings as you type. Use ↑↓ to select, Tab or Return to insert, and Escape to dismiss. Control-Space opens suggestions; Tab moves through command arguments.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }.tabItem { Label("Editor", systemImage: "text.cursor") }
             SyntaxColorSettings().tabItem { Label("Syntax Colors", systemImage: "paintpalette") }
             Form {
                 TextField("TeX binary folder", text: $texPath, prompt: Text("Automatic: /Library/TeX/texbin"))
                 Picker("Default engine", selection: $engine) { ForEach(TeXEngine.allCases) { Text($0.title).tag($0.rawValue) } }
-                Slider(value: $delay, in: 1...10, step: 0.5) { Text("Automatic compile delay: \(delay, specifier: "%.1f") s") }
+                LabeledContent("Automatic compile delay") {
+                    HStack { Slider(value: $delay, in: 1...10, step: 0.5).labelsHidden(); Text("\(delay, specifier: "%.1f") s").monospacedDigit().foregroundStyle(.secondary).frame(width: 44, alignment: .trailing) }
+                }
                 Text("Install MacTeX or BasicTeX with latexmk. Compilation uses only your local tools. Shell escape is disabled by default and configured per project.").foregroundStyle(.secondary)
                 Button(testing ? "Testing…" : "Test LaTeX Installation") { testTools() }.disabled(testing)
                 if !toolReport.isEmpty { ScrollView { Text(toolReport).font(.system(.caption, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.frame(height: 130) }

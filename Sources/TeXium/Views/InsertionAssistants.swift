@@ -22,7 +22,7 @@ struct EquationAssistant: View {
             Text("LaTeX preview").font(.caption.weight(.medium)).foregroundStyle(.secondary)
             NativeTextDisplay(text: source).frame(height: 140)
             Text("align, gather, cases, and matrices require amsmath. Compile the project to see the rendered result.").font(.caption).foregroundStyle(.secondary)
-            HStack { Spacer(); Button("Cancel") { session.sheet = nil }; Button("Insert Equation") { session.insert(source); session.sheet = nil }.keyboardShortcut(.defaultAction) }
+            HStack { Spacer(); Button("Cancel") { session.sheet = nil }.keyboardShortcut(.cancelAction); Button("Insert Equation") { session.insert(source); session.sheet = nil }.keyboardShortcut(.defaultAction) }
         }.padding(24).frame(width: 620)
         .onChange(of: environment) { _, value in
             if value == "cases" { equation = "x^2 & x \\geq 0 \\\\\n-x & x < 0" }
@@ -51,7 +51,7 @@ struct FigureAssistant: View {
             TextField("Caption (LaTeX)", text: $caption)
             TextField("Label", text: $label)
             Text("Requires graphicx. Figure paths are relative to the project root.").font(.caption).foregroundStyle(.secondary)
-            HStack { Spacer(); Button("Cancel") { session.sheet = nil }; Button("Insert Figure") { session.insert(source); session.sheet = nil }.keyboardShortcut(.defaultAction).disabled(path.isEmpty || path.contains("{") || path.contains("}") || path.contains("%")) }
+            HStack { Spacer(); Button("Cancel") { session.sheet = nil }.keyboardShortcut(.cancelAction); Button("Insert Figure") { session.insert(source); session.sheet = nil }.keyboardShortcut(.defaultAction).disabled(path.isEmpty || path.contains("{") || path.contains("}") || path.contains("%")) }
         }.padding(24).frame(width: 600).onAppear { path = images.first?.path ?? "" }
     }
 }
@@ -94,7 +94,7 @@ struct TableAssistant: View {
             HStack { Stepper("Merge first-row cells: \(merge)", value: $merge, in: 1...columns); Picker("Placement", selection: $placement) { Text("Automatic").tag("htbp"); Text("Top").tag("t"); Text("Bottom").tag("b") } }
             TextField("Caption (LaTeX)", text: $caption); TextField("Label", text: $label)
             NativeTextDisplay(text: source).frame(height: 150)
-            HStack { Text("Cell contents accept LaTeX.").font(.caption).foregroundStyle(.secondary); Spacer(); Button("Cancel") { session.sheet = nil }; Button("Insert Table") { session.insert(source); session.sheet = nil }.keyboardShortcut(.defaultAction) }
+            HStack { Text("Cell contents accept LaTeX.").font(.caption).foregroundStyle(.secondary); Spacer(); Button("Cancel") { session.sheet = nil }.keyboardShortcut(.cancelAction); Button("Insert Table") { session.insert(source); session.sheet = nil }.keyboardShortcut(.defaultAction) }
         }.padding(24).frame(width: 760).onChange(of: columns) { _, value in merge = min(merge, value) }
     }
 }

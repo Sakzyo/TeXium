@@ -53,7 +53,7 @@ struct SymbolPalette: View {
             }.listStyle(.inset)
             HStack {
                 Text("Insert in a math environment. Right-click to favorite.").font(.caption).foregroundStyle(.secondary)
-                Spacer(); Button("Cancel") { session.sheet = nil }; Button("Insert") { if let selected { insert(selected) } }.disabled(selected == nil).keyboardShortcut(.defaultAction)
+                Spacer(); Button("Cancel") { session.sheet = nil }.keyboardShortcut(.cancelAction); Button("Insert") { if let selected { insert(selected) } }.disabled(selected == nil).keyboardShortcut(.defaultAction)
             }
         }.padding(24).frame(width: 680, height: 560)
     }

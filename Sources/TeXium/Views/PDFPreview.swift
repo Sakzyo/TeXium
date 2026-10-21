@@ -11,34 +11,30 @@ struct PDFPreview: View {
     @State private var thumbnails = UserDefaults.standard.bool(forKey: "pdfThumbnails")
     @State private var matchIndex = 0
     @State private var matches: [PDFSelection] = []
+    @State private var searchedQuery: String?
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Label("Preview", systemImage: "doc.richtext").font(.callout.weight(.medium))
-                Spacer()
-                Button("Previous Page", systemImage: "chevron.up") { session.pdfView?.goToPreviousPage(nil) }.labelStyle(.iconOnly).disabled(page <= 1)
-                TextField("Page", value: $page, format: .number).frame(width: 35).multilineTextAlignment(.center).onSubmit { goToPage() }.accessibilityLabel("PDF page number")
-                Text("of \(pageCount)").font(.caption).foregroundStyle(.secondary)
-                Button("Next Page", systemImage: "chevron.down") { session.pdfView?.goToNextPage(nil) }.labelStyle(.iconOnly).disabled(page >= pageCount)
-                Menu {
-                    Button("Zoom In") { session.pdfView?.zoomIn(nil) }
-                    Button("Zoom Out") { session.pdfView?.zoomOut(nil) }
-                    Button("Actual Size") { session.pdfView?.autoScales = false; session.pdfView?.scaleFactor = 1 }
-                    Button("Fit Page") { session.pdfView?.autoScales = true }
-                    Button("Fit Width") { fitWidth() }
-                    Divider()
-                    Toggle("Thumbnails", isOn: $thumbnails)
-                    Button("Open in Preview") { if let url = session.pdfURL { NSWorkspace.shared.open(url) } }
-                    Button("Reveal in Finder") { if let url = session.pdfURL { NSWorkspace.shared.activateFileViewerSelecting([url]) } }
-                    Button("Export PDF…") { session.exportPDF() }
-                    Button("Print…") { printPDF() }
-                } label: { Text("\(zoom)%") }
+                // Lives in the header rather than as a banner, so the page never
+                // jumps when the first edit after a build marks the output stale.
+                ZStack {
+                    if session.stalePDF && session.pdfURL != nil {
+                        ViewThatFits(in: .horizontal) {
+                            Label(session.building ? "Updating…" : "Outdated", systemImage: "clock.arrow.circlepath")
+                            Image(systemName: "clock.arrow.circlepath")
+                        }
+                        .font(.caption).foregroundStyle(.secondary)
+                        .help(session.building ? "Typesetting the updated source…" : "Showing previous output — the source has changed since this PDF was typeset.")
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(session.building ? "Typesetting updated source" : "Previous output, source has changed")
+                        .transition(.opacity)
+                    }
+                }.animation(.texiumEaseOut, value: session.stalePDF)
+                Spacer(minLength: 8)
+                if session.pdfURL != nil { pageControls }
             }.buttonStyle(.borderless).padding(.horizontal, 12).frame(height: 37)
             Divider()
-            if session.stalePDF {
-                Label(session.building ? "Typesetting updated source…" : "Previous output · source has changed", systemImage: "clock.arrow.circlepath").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12).padding(.vertical, 7)
-                Divider()
-            }
             if session.pdfURL != nil {
                 HStack(spacing: 0) {
                     if thumbnails { PDFThumbnails(session: session).frame(width: 100); Divider() }
@@ -47,19 +43,58 @@ struct PDFPreview: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 Divider()
-                HStack {
+                HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                     TextField("Find in PDF", text: $query).textFieldStyle(.plain).onSubmit { find() }
-                    if !matches.isEmpty { Text("\(matchIndex + 1)/\(matches.count)").font(.caption).foregroundStyle(.secondary) }
-                    Button("Next Match", systemImage: "chevron.right") { find(next: true) }.buttonStyle(.borderless)
-                }.padding(10)
+                    if !matches.isEmpty { Text("\(matchIndex + 1) of \(matches.count)").font(.caption).foregroundStyle(.secondary).monospacedDigit() }
+                    else if !query.isEmpty && searchedQuery == query { Text("No matches").font(.caption).foregroundStyle(.secondary) }
+                    Button("Next Match", systemImage: "chevron.down") { find(next: true) }.labelStyle(.iconOnly).buttonStyle(.borderless).disabled(query.isEmpty).help("Next match (Return)")
+                }.padding(.horizontal, 12).padding(.vertical, 9)
             } else {
-                ContentUnavailableView { Label("Your Document, Typeset", systemImage: "doc.richtext") } description: { Text("Compile the project to generate a PDF.\nYour local TeX installation does the rest.") } actions: { Button("Compile Project") { session.compile() }.disabled(session.building) }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                emptyState.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }.frame(minWidth: 290, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pdf-pane")
+    }
+    @ViewBuilder private var pageControls: some View {
+        HStack(spacing: 6) {
+            Button("Previous Page", systemImage: "chevron.up") { session.pdfView?.goToPreviousPage(nil) }.labelStyle(.iconOnly).disabled(page <= 1)
+            TextField("Page", value: $page, format: .number).frame(width: 35).multilineTextAlignment(.center).onSubmit { goToPage() }.accessibilityLabel("PDF page number")
+            Text("of \(pageCount)").font(.caption).foregroundStyle(.secondary).monospacedDigit().fixedSize()
+            Button("Next Page", systemImage: "chevron.down") { session.pdfView?.goToNextPage(nil) }.labelStyle(.iconOnly).disabled(page >= pageCount)
+        }
+        Menu {
+            Button("Zoom In") { session.pdfView?.zoomIn(nil) }
+            Button("Zoom Out") { session.pdfView?.zoomOut(nil) }
+            Button("Actual Size") { session.pdfView?.autoScales = false; session.pdfView?.scaleFactor = 1 }
+            Button("Fit Page") { session.pdfView?.autoScales = true }
+            Button("Fit Width") { fitWidth() }
+            Divider()
+            Toggle("Thumbnails", isOn: $thumbnails)
+            Button("Open in Preview") { if let url = session.pdfURL { NSWorkspace.shared.open(url) } }
+            Button("Reveal in Finder") { if let url = session.pdfURL { NSWorkspace.shared.activateFileViewerSelecting([url]) } }
+            Button("Export PDF…") { session.exportPDF() }
+            Button("Print…") { printPDF() }
+        } label: { Text("\(zoom)%").monospacedDigit() }
+        .fixedSize()
+        .help("Zoom and PDF options")
+    }
+    @ViewBuilder private var emptyState: some View {
+        if session.building {
+            ContentUnavailableView {
+                Label { Text("Typesetting…") } icon: { ProgressView().controlSize(.large) }
+            } description: { Text(session.buildStatus) }
+        } else if session.buildStatus.hasPrefix("Build failed") {
+            ContentUnavailableView {
+                Label("The Build Didn’t Finish", systemImage: "exclamationmark.triangle")
+            } description: { Text("Fix the issues listed in Problems, then compile again.") } actions: {
+                Button("Show Problems") { session.inspectorTab = "Problems"; session.showInspector = true }
+                Button("Compile Project") { session.compile() }
+            }
+        } else {
+            ContentUnavailableView { Label("Your Document, Typeset", systemImage: "doc.richtext") } description: { Text("Compile the project to generate a PDF.\nYour local TeX installation does the rest.") } actions: { Button("Compile Project") { session.compile() } }
+        }
     }
     private func goToPage() { if let target = session.pdfView?.document?.page(at: max(0, min(page - 1, pageCount - 1))) { session.pdfView?.go(to: target) } }
     private func fitWidth() {
@@ -68,7 +103,9 @@ struct PDFPreview: View {
     }
     private func find(next: Bool = false) {
         guard let view = session.pdfView, let document = view.document else { return }
-        if !next { matches = document.findString(query, withOptions: [.caseInsensitive]); matchIndex = 0 }
+        if !next || searchedQuery != query {
+            matches = query.isEmpty ? [] : document.findString(query, withOptions: [.caseInsensitive]); matchIndex = 0; searchedQuery = query
+        }
         else if !matches.isEmpty { matchIndex = (matchIndex + 1) % matches.count }
         if !matches.isEmpty { view.setCurrentSelection(matches[matchIndex], animate: true); view.go(to: matches[matchIndex]) }
     }

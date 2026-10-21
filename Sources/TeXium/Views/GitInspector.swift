@@ -80,7 +80,7 @@ struct GitInspector: View {
         .task { await session.refreshGit() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in if !busy { Task { await session.refreshGit() } } }
         .sheet(isPresented: $showDetail) {
-            VStack(alignment: .leading) { Text("Git Details").font(.title2).padding(); NativeTextDisplay(text: detail, diff: true); HStack { Spacer(); Button("Done") { showDetail = false }.keyboardShortcut(.defaultAction) }.padding() }.frame(width: 850, height: 580)
+            VStack(alignment: .leading) { Text("Git Details").font(.title2.weight(.semibold)).padding(); NativeTextDisplay(text: detail, diff: true); HStack { Spacer(); Button("Done") { showDetail = false }.keyboardShortcut(.defaultAction) }.padding() }.frame(width: 850, height: 580)
         }
     }
 
@@ -136,7 +136,7 @@ struct GitHubConnectionSheet: View {
     private var repository: GitHubRepository? { try? GitHubRepository(url) }
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("Connect GitHub Repository", systemImage: "arrow.triangle.branch").font(.title2)
+            Label("Connect GitHub Repository", systemImage: "arrow.triangle.branch").font(.title2.weight(.semibold))
             Text("Create a repository on GitHub first, then paste its HTTPS or SSH URL. For a repository with existing work, cloning from the Project Browser is the easiest starting point.").foregroundStyle(.secondary)
             TextField("https://github.com/owner/project", text: $url)
             TextField("Remote name", text: $name)
@@ -165,7 +165,7 @@ struct GitCommitSheet: View {
     private var files: [GitFile] { stageAll ? session.gitFiles : session.gitFiles.filter(\.isStaged) }
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Review Commit").font(.title2)
+            Text("Review Commit").font(.title2.weight(.semibold))
             Toggle("Include all changed and untracked files", isOn: $stageAll)
             Text(stageAll ? "All files below will be staged and committed. Review untracked files and your .gitignore before including private material." : "Only the contents already staged in Git will be committed.").font(.callout).foregroundStyle(.secondary)
             List(files) { file in HStack { Text(file.status).font(.system(.caption, design: .monospaced)); Text(file.path) } }.frame(height: 190)

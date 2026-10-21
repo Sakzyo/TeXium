@@ -250,7 +250,7 @@ struct SourceEditor: NSViewRepresentable {
 
 @MainActor final class LineNumberRuler: NSRulerView {
     weak var editor: LaTeXTextView?
-    init(textView: LaTeXTextView) { editor = textView; super.init(scrollView: textView.enclosingScrollView, orientation: .verticalRuler); clientView = textView; ruleThickness = 52; textView.rebuildLines() }
+    init(textView: LaTeXTextView) { editor = textView; super.init(scrollView: textView.enclosingScrollView, orientation: .verticalRuler); clientView = textView; ruleThickness = 52; clipsToBounds = true; textView.rebuildLines() }
     required init(coder: NSCoder) { fatalError("init(coder:) is not used") }
     override func drawHashMarksAndLabels(in rect: NSRect) {
         guard let editor, let layout = editor.layoutManager, let container = editor.textContainer else { return }

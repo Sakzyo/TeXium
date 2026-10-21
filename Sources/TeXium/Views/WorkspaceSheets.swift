@@ -67,7 +67,7 @@ struct WorkspaceSheets: View {
             Toggle("Export as a folder instead of ZIP", isOn: $sourceFolder)
             Text(preset == .submission ? "Includes source, figures, bibliography files, and generated .bbl files when available. Review your destination’s submission rules before uploading." : "Build caches, version-control data, and unrelated auxiliary files are omitted from source exports.").font(.callout).foregroundStyle(.secondary)
             if busy { ProgressView() }
-            HStack { Spacer(); Button("Cancel") { session.sheet = nil }; Button("Export…") { export() }.keyboardShortcut(.defaultAction).disabled(busy) }
+            HStack { Spacer(); Button("Cancel") { session.sheet = nil }.keyboardShortcut(.cancelAction); Button("Export…") { export() }.keyboardShortcut(.defaultAction).disabled(busy) }
         }.padding(24).frame(width: 480)
     }
     private func export() {
@@ -81,8 +81,8 @@ struct WorkspaceSheets: View {
             Text("Paste BibTeX").font(.title2.weight(.semibold))
             Text("Entries are appended to references.bib. Existing duplicate keys are left unchanged.").font(.callout).foregroundStyle(.secondary)
             TextEditor(text: $text).font(.system(.body, design: .monospaced)).frame(height: 280)
-            Text("\(BibTeXParser.parse(text).count) entries detected").font(.caption).foregroundStyle(.secondary)
-            HStack { Spacer(); Button("Cancel") { session.sheet = nil }; Button("Add Entries") { addBib() }.disabled(BibTeXParser.parse(text).isEmpty).keyboardShortcut(.defaultAction) }
+            Text("\(BibTeXParser.parse(text).count.counted("entry", plural: "entries")) detected").monospacedDigit().font(.caption).foregroundStyle(.secondary)
+            HStack { Spacer(); Button("Cancel") { session.sheet = nil }.keyboardShortcut(.cancelAction); Button("Add Entries") { addBib() }.disabled(BibTeXParser.parse(text).isEmpty).keyboardShortcut(.defaultAction) }
         }.padding(24).frame(width: 620)
     }
     private func addBib() {
@@ -134,7 +134,7 @@ struct CustomBuildSheet: View {
             TextField("Absolute executable path", text: $executable)
             TextField("Arguments as a JSON array", text: $arguments)
             Text("The executable runs in the project folder with your account’s permissions. Arguments are passed directly, without a shell. Output appears in the Build Log.").font(.callout).foregroundStyle(.secondary)
-            HStack { Spacer(); Button("Cancel") { session.sheet = nil }; Button("Review and Run…") { approval = true }.disabled(executable.isEmpty || session.building || session.operationBusy) }
+            HStack { Spacer(); Button("Cancel") { session.sheet = nil }.keyboardShortcut(.cancelAction); Button("Review and Run…") { approval = true }.disabled(executable.isEmpty || session.building || session.operationBusy) }
         }.padding(24).frame(width: 600)
         .alert("Run This Executable?", isPresented: $approval) {
             Button("Cancel", role: .cancel) {}

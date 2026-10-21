@@ -27,16 +27,18 @@ struct ProjectSearchSheet: View {
             if let error { Text(error).foregroundStyle(.red).font(.callout) }
             List {
                 ForEach(Array(Set(hits.map(\.file))).sorted(), id: \.self) { file in
-                    Section("\(file) · \(hits.filter { $0.file == file }.count) matches") {
+                    Section("\(file) · \(hits.filter { $0.file == file }.count.counted("match", plural: "matches"))") {
                         ForEach(hits.filter { $0.file == file }) { hit in
                             Button { Task { await session.select(hit.file, line: hit.line); session.sheet = nil } } label: {
-                                HStack(alignment: .top) { Text("\(hit.line)").monospacedDigit().foregroundStyle(.secondary).frame(width: 40, alignment: .trailing); Text(hit.excerpt).font(.system(.callout, design: .monospaced)).lineLimit(2) }
+                                HStack(alignment: .firstTextBaseline) { Text("\(hit.line)").monospacedDigit().foregroundStyle(.secondary).frame(width: 40, alignment: .trailing); Text(hit.excerpt).font(.system(.callout, design: .monospaced)).lineLimit(2); Spacer(minLength: 0) }
+                                    .contentShape(Rectangle())
                             }.buttonStyle(.plain)
                         }
                     }
                 }
             }.listStyle(.inset)
-            HStack { Text("\(hits.count) matches in \(Set(hits.map(\.file)).count) files").font(.caption).foregroundStyle(.secondary); Spacer(); Button("Done") { session.sheet = nil }.keyboardShortcut(.cancelAction) }
+            .overlay { if result != nil && hits.isEmpty && !busy { ContentUnavailableView.search(text: searchedQuery) } }
+            HStack { Text(result == nil ? "Press Return to search all project sources." : "\(hits.count.counted("match", plural: "matches")) in \(Set(hits.map(\.file)).count.counted("file"))").font(.caption).foregroundStyle(.secondary).monospacedDigit(); Spacer(); Button("Done") { session.sheet = nil }.keyboardShortcut(.cancelAction) }
         }.padding(24).frame(width: 860, height: 600)
         .alert("Replace \(hits.count) Matches?", isPresented: $confirmReplace) {
             Button("Cancel", role: .cancel) {}
