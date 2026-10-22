@@ -16,26 +16,32 @@ import TeXiumCore
     override init() {
         super.init()
         panel.isReleasedWhenClosed = false; panel.hasShadow = true; panel.hidesOnDeactivate = true
-        panel.backgroundColor = .windowBackgroundColor
+        // Shown on nearly every keystroke: no fade, and a clear window so the
+        // rounded material defines the shape (and shadow) instead of a square backing.
+        panel.isOpaque = false; panel.backgroundColor = .clear; panel.animationBehavior = .none
         panel.setAccessibilityLabel("LaTeX suggestions")
-        let content = NSView(); content.wantsLayer = true
-        content.layer?.cornerRadius = 8; content.layer?.masksToBounds = true
+        let content = NSVisualEffectView()
+        content.material = .menu; content.blendingMode = .behindWindow; content.state = .active
+        content.maskImage = Self.roundedMask(radius: Self.cornerRadius)
         panel.contentView = content
         heading.font = .systemFont(ofSize: 11, weight: .semibold); heading.textColor = .secondaryLabelColor
         let footer = NSTextField(labelWithString: "↑↓ Select    Tab / Return Insert    Esc Dismiss")
-        footer.font = .systemFont(ofSize: 10); footer.textColor = .secondaryLabelColor
+        footer.font = .systemFont(ofSize: 10); footer.textColor = .tertiaryLabelColor
+        let border = CompletionBorder(radius: Self.cornerRadius)
         table.addTableColumn(NSTableColumn(identifier: NSUserInterfaceItemIdentifier("suggestion")))
         table.headerView = nil; table.rowHeight = 43; table.intercellSpacing = .zero
         table.style = .plain; table.backgroundColor = .clear; table.selectionHighlightStyle = .regular
         table.dataSource = self; table.delegate = self; table.target = self; table.action = #selector(choose)
         table.setAccessibilityIdentifier("latex-completions"); table.setAccessibilityLabel("LaTeX suggestions")
         scroll.documentView = table; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true; scroll.drawsBackground = false
-        for view in [heading, scroll, footer] { view.translatesAutoresizingMaskIntoConstraints = false; content.addSubview(view) }
+        for view in [heading, scroll, footer, border] { view.translatesAutoresizingMaskIntoConstraints = false; content.addSubview(view) }
         NSLayoutConstraint.activate([
+            border.leadingAnchor.constraint(equalTo: content.leadingAnchor), border.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            border.topAnchor.constraint(equalTo: content.topAnchor), border.bottomAnchor.constraint(equalTo: content.bottomAnchor),
             heading.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12), heading.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -12),
             heading.topAnchor.constraint(equalTo: content.topAnchor, constant: 9), heading.heightAnchor.constraint(equalToConstant: 16),
-            scroll.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 6), scroll.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 4),
-            scroll.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -4), scroll.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -5),
+            scroll.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 6), scroll.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: content.trailingAnchor), scroll.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -5),
             footer.leadingAnchor.constraint(equalTo: heading.leadingAnchor), footer.trailingAnchor.constraint(equalTo: heading.trailingAnchor),
             footer.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -8), footer.heightAnchor.constraint(equalToConstant: 14)
         ])
@@ -56,6 +62,7 @@ import TeXiumCore
         let below = caret.minY - height - 3
         let y = below >= available.minY ? below : min(caret.maxY + 3, available.maxY - height)
         panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
+        panel.invalidateShadow()
         if panel.parent !== parent {
             close(); parent.addChildWindow(panel, ordered: .above)
         }
@@ -82,23 +89,70 @@ import TeXiumCore
     @objc private func dismiss() { onDismiss?() }
     @objc private func choose() { if table.selectedRow >= 0 { onChoose?(table.selectedRow) } }
     func numberOfRows(in tableView: NSTableView) -> Int { items.count }
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { CompletionRow() }
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let item = items[row]
-        let cell = NSTableCellView()
+        let cell = CompletionCell()
         let title = NSTextField(labelWithString: item.title)
         title.font = .monospacedSystemFont(ofSize: 12, weight: .medium)
         title.lineBreakMode = .byTruncatingTail; title.setAccessibilityIdentifier("completion-" + (kind == .environment ? item.title : item.insertion))
         let detail = NSTextField(labelWithString: item.detail.replacingOccurrences(of: "\n", with: " "))
         detail.font = .systemFont(ofSize: 10.5); detail.textColor = .secondaryLabelColor; detail.lineBreakMode = .byTruncatingTail
-        cell.textField = title; cell.toolTip = item.title + "\n" + item.detail
+        cell.textField = title; cell.detail = detail; cell.toolTip = item.title + "\n" + item.detail
         for field in [title, detail] { field.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(field) }
         NSLayoutConstraint.activate([
-            title.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8), title.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
+            title.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 12), title.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -12),
             title.topAnchor.constraint(equalTo: cell.topAnchor, constant: 5),
             detail.leadingAnchor.constraint(equalTo: title.leadingAnchor), detail.trailingAnchor.constraint(equalTo: title.trailingAnchor),
             detail.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 2)
         ])
         return cell
+    }
+    private static let cornerRadius: CGFloat = 10
+    private static func roundedMask(radius: CGFloat) -> NSImage {
+        let edge = radius * 2 + 1
+        let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+            NSColor.black.setFill(); NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill(); return true
+        }
+        image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+        image.resizingMode = .stretch
+        return image
+    }
+}
+
+/// Hairline edge so the material separates from light editor backgrounds.
+private final class CompletionBorder: NSView {
+    private let radius: CGFloat
+    init(radius: CGFloat) { self.radius = radius; super.init(frame: .zero) }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override func draw(_ dirtyRect: NSRect) {
+        let width = 1 / (window?.backingScaleFactor ?? 2)
+        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: width / 2, dy: width / 2), xRadius: radius - width / 2, yRadius: radius - width / 2)
+        path.lineWidth = width
+        NSColor.separatorColor.setStroke(); path.stroke()
+    }
+    override func viewDidChangeEffectiveAppearance() { needsDisplay = true }
+    override func viewDidChangeBackingProperties() { needsDisplay = true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+/// The panel never becomes key, so AppKit would draw a gray, unemphasized
+/// selection. Completion lists read as the active focus, like Xcode's.
+private final class CompletionRow: NSTableRowView {
+    override var isEmphasized: Bool { get { true } set {} }
+    override func drawSelection(in dirtyRect: NSRect) {
+        guard selectionHighlightStyle != .none else { return }
+        NSColor.selectedContentBackgroundColor.setFill()
+        NSBezierPath(roundedRect: bounds.insetBy(dx: 6, dy: 1), xRadius: 6, yRadius: 6).fill()
+    }
+}
+private final class CompletionCell: NSTableCellView {
+    weak var detail: NSTextField?
+    override var backgroundStyle: NSView.BackgroundStyle {
+        didSet {
+            let emphasized = backgroundStyle == .emphasized
+            textField?.textColor = emphasized ? .alternateSelectedControlTextColor : .labelColor
+            detail?.textColor = emphasized ? .alternateSelectedControlTextColor.withAlphaComponent(0.8) : .secondaryLabelColor
+        }
     }
 }
 

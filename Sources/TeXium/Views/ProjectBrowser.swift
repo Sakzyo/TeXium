@@ -13,6 +13,8 @@ struct ProjectBrowser: View {
     @State private var cloneURL = ""
     @State private var cloning = false
     @State private var busy = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var selectedProject: RecentProject? { library.recents.first { $0.path == selection } }
     private var projects: [RecentProject] {
         library.recents.filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) || $0.path.localizedCaseInsensitiveContains(search) }
             .sorted { $0.favorite != $1.favorite ? $0.favorite : $0.opened > $1.opened }
@@ -29,19 +31,31 @@ struct ProjectBrowser: View {
                             }
                         } icon: { Image(systemName: project.favorite ? "star.fill" : "folder") }
                         .tag(project.path)
-                        .contextMenu {
-                            Button("Open Project") { open(project) }
-                            Button(project.favorite ? "Unpin" : "Pin") { library.favorite(project) }
-                            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: project.path)]) }
-                            Button("Rename…") { rename(project) }
-                            Button("Duplicate…") { duplicate(project) }
-                            Divider()
-                            Button("Remove from Recents") { library.remove(project) }
-                        }
-                        .onTapGesture(count: 2) { open(project) }
                     }
                 }
-            }.listStyle(.sidebar).searchable(text: $search, prompt: "Find a project")
+            }
+            .listStyle(.sidebar).searchable(text: $search, prompt: "Find a project")
+            // Native list semantics: single click selects at once; double-click or Return opens.
+            .contextMenu(forSelectionType: String.self) { paths in
+                if let project = paths.first.flatMap({ path in library.recents.first { $0.path == path } }) {
+                    Button("Open Project") { open(project) }
+                    Button(project.favorite ? "Unpin" : "Pin") { library.favorite(project) }
+                    Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: project.path)]) }
+                    Button("Rename…") { rename(project) }
+                    Button("Duplicate…") { duplicate(project) }
+                    Divider()
+                    Button("Remove from Recents") { library.remove(project) }
+                }
+            } primaryAction: { paths in
+                if let project = paths.first.flatMap({ path in library.recents.first { $0.path == path } }) { open(project) }
+            }
+            .overlay {
+                if library.recents.isEmpty {
+                    ContentUnavailableView("No Recent Projects", systemImage: "clock", description: Text("Projects you create or open appear here."))
+                } else if projects.isEmpty {
+                    ContentUnavailableView.search(text: search)
+                }
+            }
             .navigationSplitViewColumnWidth(min: 260, ideal: 310, max: 400)
         } detail: {
             VStack(spacing: 20) {
@@ -50,20 +64,27 @@ struct ProjectBrowser: View {
                     Text("TeXium").font(.largeTitle.weight(.semibold))
                     Text("A place for your next paper.").font(.title3).foregroundStyle(.secondary)
                 }
-                if let project = library.recents.first(where: { $0.path == selection }) {
-                    VStack(spacing: 6) {
-                        Text(project.name).font(.headline)
-                        Text("Opened \(project.opened.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary)
-                        if let modified = project.modified { Text("Modified \(modified.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary) }
-                        Button("Open Project") { open(project) }.keyboardShortcut(.return, modifiers: [])
-                    }.padding(.top, 8)
-                }
                 VStack(spacing: 10) {
                     Button { creating = true } label: { Label("Create a Project…", systemImage: "plus") }.buttonStyle(.borderedProminent)
                     Button { chooseProject() } label: { Label("Open an Existing Folder…", systemImage: "folder") }
                 }.controlSize(.large)
                 Text("Write, typeset, and explore. Entirely on your Mac.").font(.caption).foregroundStyle(.tertiary).padding(.top, 12)
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            // An overlay, not part of the centered stack, so selecting a project
+            // never pushes the welcome content around.
+            .overlay(alignment: .bottom) {
+                ZStack {
+                    if let project = selectedProject {
+                        selectionFooter(project)
+                            .transition(.asymmetric(
+                                insertion: reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 6)),
+                                removal: .opacity.animation(.easeOut(duration: 0.12))))
+                    }
+                }
+                // Only appearing and disappearing animate; moving between
+                // projects with the arrow keys updates instantly.
+                .animation(.texiumEaseOut, value: selectedProject == nil)
+            }
         }
         .frame(minWidth: 720, minHeight: 480)
         .toolbar {
@@ -80,10 +101,16 @@ struct ProjectBrowser: View {
         .sheet(isPresented: $creating) { NewProjectSheet { url in library.remember(url); openWindow(id: "project", value: url.path) } }
         .sheet(isPresented: $cloning) {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Clone a Git Repository").font(.title2)
-                TextField("Repository URL", text: $cloneURL).frame(width: 440)
+                Text("Clone a Git Repository").font(.title2.weight(.semibold))
+                TextField("Repository URL", text: $cloneURL, prompt: Text("https://github.com/owner/repository.git")).frame(width: 440)
+                    .onSubmit { if canClone { clone() } }
                 Text("For HTTPS GitHub access, add a token in Settings → GitHub. SSH uses your configured keys.").font(.caption).foregroundStyle(.secondary)
-                HStack { Spacer(); Button("Cancel") { cloning = false }; Button("Choose Destination…") { clone() }.disabled(cloneURL.isEmpty || busy) }
+                HStack {
+                    if busy { ProgressView().controlSize(.small); Text("Cloning…").font(.caption).foregroundStyle(.secondary) }
+                    Spacer()
+                    Button("Cancel") { cloning = false }.keyboardShortcut(.cancelAction)
+                    Button("Choose Destination…") { clone() }.keyboardShortcut(.defaultAction).disabled(!canClone)
+                }
             }.padding(24)
         }
         .alert("TeXium", isPresented: Binding(get: { library.error != nil }, set: { if !$0 { library.error = nil } })) { Button("OK") { library.error = nil } } message: { Text(library.error ?? "") }
@@ -102,6 +129,28 @@ struct ProjectBrowser: View {
                 }
             }
         }
+    }
+    private var canClone: Bool { !cloneURL.trimmingCharacters(in: .whitespaces).isEmpty && !busy }
+    private func selectionFooter(_ project: RecentProject) -> some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 12) {
+                Image(systemName: project.favorite ? "star.fill" : "folder").font(.title2).foregroundStyle(.secondary).frame(width: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(project.name).font(.headline).lineLimit(1)
+                    Text(project.available ? details(project) : "Unavailable at its last known location").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 12)
+                Button("Open Project") { open(project) }.keyboardShortcut(.return, modifiers: [])
+            }
+            .padding(.horizontal, 20).padding(.vertical, 12)
+        }
+        .background(.bar)
+    }
+    private func details(_ project: RecentProject) -> String {
+        var parts = ["Opened " + project.opened.formatted(.relative(presentation: .named))]
+        if let modified = project.modified { parts.append("Modified " + modified.formatted(.relative(presentation: .named))) }
+        return parts.joined(separator: " · ")
     }
     private func open(_ project: RecentProject) {
         do { let url = try library.resolve(project); library.remember(url); openWindow(id: "project", value: url.path) }
@@ -158,7 +207,11 @@ struct NewProjectSheet: View {
                     Text(selected.rawValue).font(.title)
                     Text(selected.detail).foregroundStyle(.secondary)
                     Divider()
-                    Text("Standard LaTeX files\nAvailable offline\nReady for your own toolchain").font(.callout).foregroundStyle(.secondary).lineSpacing(8)
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(["Standard LaTeX files", "Available offline", "Ready for your own toolchain"], id: \.self) { feature in
+                            Label { Text(feature) } icon: { Image(systemName: "checkmark").font(.caption.weight(.semibold)).foregroundStyle(.tertiary) }
+                        }
+                    }.font(.callout).foregroundStyle(.secondary)
                     Spacer()
                 }.padding(28).frame(minWidth: 330, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }

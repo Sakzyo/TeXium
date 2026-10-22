@@ -38,7 +38,7 @@ struct InspectorEmptyState: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(title, systemImage: symbol).font(.headline)
+            Label { Text(title) } icon: { Image(systemName: symbol).foregroundStyle(.secondary) }.font(.headline)
             Text(message).font(.callout).foregroundStyle(.secondary)
         }
         .padding(12)
@@ -48,15 +48,31 @@ struct InspectorEmptyState: View {
 
 struct OutlineInspector: View {
     let session: ProjectSession
+    /// The main document reads first; included files follow alphabetically.
+    private var files: [String] {
+        let main = session.configuration.mainFile
+        return Set(session.outline.map(\.file)).sorted { ($0 == main ? 0 : 1, $0) < ($1 == main ? 0 : 1, $1) }
+    }
     var body: some View {
         if session.outline.isEmpty { InspectorEmptyState(title: "No Sections Yet", symbol: "list.bullet.indent", message: "Add sections or chapters to navigate your document here.") }
         else {
+            let topLevel = session.outline.map(\.level).min() ?? 2
             List {
-                ForEach(Array(Set(session.outline.map(\.file))).sorted(), id: \.self) { file in
+                ForEach(files, id: \.self) { file in
                     Section((file as NSString).lastPathComponent) {
                         ForEach(session.outline.filter { $0.file == file }) { item in
+                            let depth = max(0, item.level - topLevel)
                             Button { Task { await session.select(item.file, line: item.line) } } label: {
-                                HStack { Text(item.title).lineLimit(2); Spacer(); Text("\(item.line)").font(.caption).foregroundStyle(.tertiary) }.padding(.leading, CGFloat(max(0, item.level - 2) * 10))
+                                HStack(alignment: .firstTextBaseline) {
+                                    // Weight and tone carry the hierarchy, so indentation can stay shallow.
+                                    Text(item.title).lineLimit(2)
+                                        .fontWeight(depth == 0 ? .medium : .regular)
+                                        .foregroundStyle(depth < 2 ? .primary : .secondary)
+                                    Spacer(minLength: 8)
+                                    Text("\(item.line)").font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                                }
+                                .padding(.leading, CGFloat(depth) * 12)
+                                .contentShape(Rectangle())
                             }.buttonStyle(.plain).help("\(file):\(item.line)")
                         }
                     }
@@ -69,23 +85,33 @@ struct ProblemsInspector: View {
     let session: ProjectSession
     @State private var filter = "All"
     private var diagnostics: [Diagnostic] { session.diagnostics.filter { filter == "All" || (filter == "Errors" ? $0.severity == .error : $0.severity != .error) } }
+    private var errorCount: Int { session.diagnostics.filter { $0.severity == .error }.count }
+    private var warningCount: Int { session.diagnostics.count - errorCount }
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Severity", selection: $filter) { Text("All").tag("All"); Text("Errors").tag("Errors"); Text("Warnings").tag("Warnings") }.pickerStyle(.segmented).padding(10)
-            if diagnostics.isEmpty { InspectorEmptyState(title: "No Compilation Issues", symbol: "checkmark.circle", message: session.building ? "Typesetting is in progress." : "Diagnostics from your local compiler appear here.") }
+            Picker("Severity", selection: $filter) {
+                Text("All").tag("All")
+                Text(errorCount > 0 ? "Errors \(errorCount)" : "Errors").tag("Errors")
+                Text(warningCount > 0 ? "Warnings \(warningCount)" : "Warnings").tag("Warnings")
+            }.pickerStyle(.segmented).labelsHidden().padding(10)
+            if session.diagnostics.isEmpty { InspectorEmptyState(title: "No Compilation Issues", symbol: "checkmark.circle", message: session.building ? "Typesetting is in progress." : "Diagnostics from your local compiler appear here.") }
+            else if diagnostics.isEmpty { InspectorEmptyState(title: filter == "Errors" ? "No Errors" : "No Warnings", symbol: "checkmark.circle", message: filter == "Errors" ? "Only warnings remain from the last build." : "Only errors remain from the last build.") }
             else {
                 List {
                     ForEach(Array(Set(diagnostics.map { $0.file ?? "Build" })).sorted(), id: \.self) { file in
                         Section(file) {
                             ForEach(diagnostics.filter { ($0.file ?? "Build") == file }) { diagnostic in
                                 Button { session.navigate(diagnostic) } label: {
-                                    HStack(alignment: .top, spacing: 8) {
-                                        Image(systemName: diagnostic.severity.symbol).foregroundStyle(diagnostic.severity == .error ? Color.red : Color.orange)
-                                        VStack(alignment: .leading, spacing: 5) {
+                                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                        Image(systemName: diagnostic.severity.symbol).foregroundStyle(tint(diagnostic.severity))
+                                        VStack(alignment: .leading, spacing: 4) {
                                             Text(diagnostic.message).font(.callout).fixedSize(horizontal: false, vertical: true)
-                                            Text(diagnostic.severity.rawValue.capitalized + (diagnostic.line.map { " · Line \($0)" } ?? "")).font(.caption).foregroundStyle(.secondary)
+                                            Text(diagnostic.severity.title + (diagnostic.line.map { " · Line \($0)" } ?? "")).font(.caption).foregroundStyle(.secondary)
                                         }
+                                        Spacer(minLength: 0)
                                     }
+                                    .padding(.vertical, 2)
+                                    .contentShape(Rectangle())
                                 }.buttonStyle(.plain)
                                 .contextMenu {
                                     Button("Copy Diagnostic") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(diagnostic.message, forType: .string) }
@@ -99,30 +125,51 @@ struct ProblemsInspector: View {
         }
     }
 }
+private extension ProblemsInspector {
+    func tint(_ severity: Severity) -> AnyShapeStyle {
+        switch severity {
+        case .error: AnyShapeStyle(.red)
+        case .warning: AnyShapeStyle(.orange)
+        case .badBox, .information: AnyShapeStyle(.secondary)
+        }
+    }
+}
+private extension Severity {
+    var title: String { self == .badBox ? "Bad Box" : rawValue.capitalized }
+}
 struct ReferencesInspector: View {
     @Bindable var session: ProjectSession
     @State private var query = ""
     @State private var selected: String?
+    private var filtered: [BibEntry] { session.references.filter { query.isEmpty || $0.searchText.localizedCaseInsensitiveContains(query) } }
+    private func entry(for ids: Set<String>) -> BibEntry? { ids.first.flatMap { id in session.references.first { $0.id == id } } }
     var body: some View {
         VStack(spacing: 0) {
             TextField("Search references", text: $query).textFieldStyle(.roundedBorder).padding(10)
             if session.references.isEmpty { InspectorEmptyState(title: "No References", symbol: "books.vertical", message: "Import a .bib file or paste BibTeX entries to get started.") }
+            else if filtered.isEmpty { InspectorEmptyState(title: "No Matches", symbol: "magnifyingglass", message: "No references match “\(query)”.") }
             else {
                 List(selection: $selected) {
-                    ForEach(session.references.filter { query.isEmpty || $0.searchText.localizedCaseInsensitiveContains(query) }) { entry in
+                    ForEach(filtered) { entry in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(entry.title.replacingOccurrences(of: "{", with: "").replacingOccurrences(of: "}", with: "")).font(.callout).lineLimit(3)
                             Text([entry.author, entry.year].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                             Text(entry.key).font(.system(.caption, design: .monospaced)).foregroundStyle(.tertiary)
                         }.padding(.vertical, 3).tag(entry.id)
-                        .onTapGesture(count: 2) { session.insert("\\cite{\(entry.key)}") }
-                        .contextMenu {
-                            Button("Insert Citation") { session.insert("\\cite{\(entry.key)}") }
-                            Button("Edit BibTeX Source") { Task { await session.select(entry.file, line: entry.line) } }
-                            Button("Copy Citation Key") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(entry.key, forType: .string) }
-                        }
                     }
-                }.listStyle(.inset)
+                }
+                .listStyle(.inset)
+                // Native selection semantics: single click selects immediately,
+                // double-click or Return inserts — no tap-gesture delay.
+                .contextMenu(forSelectionType: String.self) { ids in
+                    if let entry = entry(for: ids) {
+                        Button("Insert Citation") { session.insert("\\cite{\(entry.key)}") }
+                        Button("Edit BibTeX Source") { Task { await session.select(entry.file, line: entry.line) } }
+                        Button("Copy Citation Key") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(entry.key, forType: .string) }
+                    }
+                } primaryAction: { ids in
+                    if let entry = entry(for: ids) { session.insert("\\cite{\(entry.key)}") }
+                }
             }
             Divider()
             HStack {

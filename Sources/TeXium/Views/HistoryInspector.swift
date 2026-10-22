@@ -11,7 +11,7 @@ struct HistoryInspector: View {
     private var revision: Revision? { session.revisions.first { $0.id == selected } }
     var body: some View {
         VStack(spacing: 0) {
-            HStack { Text("Local Snapshots").font(.caption).foregroundStyle(.secondary); Spacer(); Button("Take Snapshot", systemImage: "plus") { session.sheet = .snapshot }.labelStyle(.iconOnly) }.padding(12)
+            HStack { Text("Local Snapshots").font(.caption).foregroundStyle(.secondary); Spacer(); Button("Take Snapshot", systemImage: "plus") { session.sheet = .snapshot }.labelStyle(.iconOnly).buttonStyle(.borderless).help("Take Snapshot") }.padding(12)
             if session.revisions.isEmpty {
                 InspectorEmptyState(title: "No Snapshots Yet", symbol: "clock.arrow.circlepath", message: "Take a snapshot to save a local version of this project.")
             } else {
@@ -19,7 +19,7 @@ struct HistoryInspector: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Label(revision.label, systemImage: "clock.arrow.circlepath").font(.callout)
                         Text(revision.date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
-                        Text("\(revision.files.count) files").font(.caption).foregroundStyle(.tertiary)
+                        Text(revision.files.count.counted("file")).font(.caption).foregroundStyle(.tertiary)
                     }.tag(revision.id).padding(.vertical, 3)
                 }.listStyle(.inset)
             }
@@ -41,7 +41,7 @@ struct HistoryInspector: View {
         .onChange(of: selected) { _, _ in chosenFile = revision?.files.keys.contains(session.selected ?? "") == true ? session.selected! : (revision?.files.keys.sorted().first ?? "") }
         .sheet(isPresented: $showDiff) {
             VStack(alignment: .leading) {
-                Text("Revision Comparison").font(.title2).padding([.top, .horizontal], 20)
+                Text("Revision Comparison").font(.title2.weight(.semibold)).padding([.top, .horizontal], 20)
                 NativeTextDisplay(text: session.historyDiff, diff: true)
                 HStack { Spacer(); Button("Done") { showDiff = false }.keyboardShortcut(.defaultAction) }.padding(16)
             }.frame(width: 900, height: 620)
