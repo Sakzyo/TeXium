@@ -11,15 +11,13 @@ struct HistoryInspector: View {
     private var revision: Revision? { session.revisions.first { $0.id == selected } }
     var body: some View {
         VStack(spacing: 0) {
-            HStack { Text("Local Snapshots").font(.caption).foregroundStyle(.secondary); Spacer(); Button("Take Snapshot", systemImage: "plus") { session.sheet = .snapshot }.labelStyle(.iconOnly).buttonStyle(.borderless).help("Take Snapshot") }.padding(12)
             if session.revisions.isEmpty {
                 InspectorEmptyState(title: "No Snapshots Yet", symbol: "clock.arrow.circlepath", message: "Take a snapshot to save a local version of this project.")
             } else {
                 List(session.revisions, selection: $selected) { revision in
                     VStack(alignment: .leading, spacing: 5) {
-                        Label(revision.label, systemImage: "clock.arrow.circlepath").font(.callout)
-                        Text(revision.date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
-                        Text(revision.files.count.counted("file")).font(.caption).foregroundStyle(.tertiary)
+                        Text(revision.label)
+                        Text(revision.date.formatted(date: .abbreviated, time: .shortened) + " · " + revision.files.count.counted("file")).font(.subheadline).foregroundStyle(.secondary)
                     }.tag(revision.id).padding(.vertical, 3)
                 }.listStyle(.inset)
             }
@@ -34,8 +32,12 @@ struct HistoryInspector: View {
                             Button("Restore Entire Project…") { restoreWhole = true; restore = true }
                         }
                     }
-                    Button("Export This Revision…") { export(revision) }.font(.caption)
+                    Button("Export This Revision…") { export(revision) }
                 }.padding(12)
+            }
+            InspectorBar(edge: .bottom) {
+                Button("Take Snapshot…", systemImage: "plus") { session.sheet = .snapshot }
+                Spacer()
             }
         }
         .onChange(of: selected) { _, _ in chosenFile = revision?.files.keys.contains(session.selected ?? "") == true ? session.selected! : (revision?.files.keys.sorted().first ?? "") }

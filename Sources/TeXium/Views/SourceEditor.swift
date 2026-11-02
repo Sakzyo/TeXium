@@ -140,9 +140,41 @@ struct SourceEditor: NSViewRepresentable {
         didSet { if oldValue != syntaxPalette { highlight(NSRange(location: 0, length: (string as NSString).length)) } }
     }
     var lineStarts: [Int] = [0]
+    private var paragraphStyles: [Int: NSParagraphStyle] = [:]
+    private var paragraphStyleFont: NSFont?
     func highlight(_ input: NSRange) {
         guard let storage = textStorage else { return }
         LaTeXSyntaxHighlighter.apply(to: storage, range: input, palette: syntaxPalette, enabled: highlightEnabled)
+        applyParagraphStyles(input)
+    }
+    /// Soft-wrapped lines hang two columns past their own indentation, so a
+    /// wrap never reads as a new source line. Extra leading keeps dense markup legible.
+    private func applyParagraphStyles(_ input: NSRange) {
+        guard let storage = textStorage, let font else { return }
+        if paragraphStyleFont != font { paragraphStyles = [:]; paragraphStyleFont = font; defaultParagraphStyle = paragraphStyle(columns: 0) }
+        let ns = storage.string as NSString
+        let location = min(input.location, ns.length)
+        let range = ns.lineRange(for: NSRange(location: location, length: min(input.length, ns.length - location)))
+        let tabWidth = max(1, UserDefaults.standard.integer(forKey: "tabWidth") == 0 ? 4 : UserDefaults.standard.integer(forKey: "tabWidth"))
+        storage.beginEditing()
+        ns.enumerateSubstrings(in: range, options: [.byLines, .substringNotRequired]) { _, line, enclosing, _ in
+            var columns = 0; var index = line.location
+            while index < NSMaxRange(line) {
+                let character = ns.character(at: index)
+                if character == 32 { columns += 1 } else if character == 9 { columns += tabWidth } else { break }
+                index += 1
+            }
+            storage.addAttribute(.paragraphStyle, value: self.paragraphStyle(columns: columns), range: enclosing)
+        }
+        storage.endEditing()
+    }
+    private func paragraphStyle(columns: Int) -> NSParagraphStyle {
+        if let style = paragraphStyles[columns] { return style }
+        let style = NSMutableParagraphStyle()
+        style.lineHeightMultiple = 1.2
+        if let font { style.headIndent = CGFloat(columns + 2) * (" " as NSString).size(withAttributes: [.font: font]).width }
+        paragraphStyles[columns] = style
+        return style
     }
     func rebuildLines() {
         lineStarts = [0]
@@ -262,7 +294,11 @@ struct SourceEditor: NSViewRepresentable {
         for (index, start) in editor.lineStarts.enumerated() where start >= max(0, characters.location - 200) && start <= NSMaxRange(characters) {
             guard start < ns.length else { continue }
             let glyph = layout.glyphIndexForCharacter(at: start); let lineRect = layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
-            let y = lineRect.minY + origin.y - visible.minY + 1
+            // Share the source line's baseline; the numerals are smaller than the text.
+            // Extra leading sits above the glyphs, so measure up from the fragment's
+            // bottom (a blank line's newline glyph reports no usable baseline).
+            let baseline = lineRect.maxY + (editor.font?.descender ?? font.descender)
+            let y = baseline + origin.y - visible.minY - font.ascender
             let label = "\(index + 1)" as NSString
             let selected = NSLocationInRange(editor.selectedRange().location, ns.lineRange(for: NSRange(location: start, length: 0)))
             let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: selected ? NSColor.labelColor : NSColor.tertiaryLabelColor]

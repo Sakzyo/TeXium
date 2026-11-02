@@ -6,6 +6,7 @@ struct GitInspector: View {
     @State private var branch = ""
     @State private var detail = ""
     @State private var showDetail = false
+    @State private var summaryHeight: CGFloat = 0
     @Environment(\.openSettings) private var openSettings
     private var busy: Bool { session.operationBusy || session.building || session.gitTask != nil }
 
@@ -38,19 +39,21 @@ struct GitInspector: View {
                     if !session.gitLog.isEmpty {
                         Button("Show Operation Log…") { detail = session.gitLog; showDetail = true }
                     }
-                }.font(.callout).padding(12)
+                }.padding(12)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { summaryHeight = $0 }
             }
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxHeight: 340)
+            // Hug the summary up to a cap, so it sits directly under the picker
+            // instead of centering in a fixed-height frame.
+            .frame(height: min(summaryHeight, 340))
             if let state = session.gitState {
                 Divider()
-                HStack { Text("Changes · \(state.files.count)"); Spacer(); Text("\(state.staged.count) staged").foregroundStyle(.secondary) }.font(.caption).padding(12)
+                InspectorBar { Text("Changes · \(state.files.count)").font(.subheadline.weight(.medium)); Spacer(); Text("\(state.staged.count) staged").font(.subheadline).foregroundStyle(.secondary) }
                 if state.files.isEmpty {
                     InspectorEmptyState(title: "Working Tree Clean", symbol: "checkmark.circle", message: "Saved changes will appear here.")
                 } else {
                     List(state.files) { file in
                         HStack(alignment: .top) {
-                            Text(file.status).font(.system(.caption, design: .monospaced)).foregroundStyle(file.isConflict ? Color.orange : Color.secondary)
+                            Text(file.status).font(.system(.subheadline, design: .monospaced)).foregroundStyle(file.isConflict ? Color.orange : Color.secondary)
                             Text(file.path).lineLimit(2).help(file.path)
                             Spacer(minLength: 0)
                             if file.isStaged { Image(systemName: "checkmark.circle.fill").foregroundStyle(.secondary).help("Staged") }
@@ -71,7 +74,7 @@ struct GitInspector: View {
                         Button("Review Commit…") { session.sheet = .gitCommit }.disabled(state.files.isEmpty || state.conflicted || state.operationInProgress)
                     }
                     HStack { TextField("Existing local branch", text: $branch); Button("Switch") { session.switchGitBranch(branch) }.disabled(branch.isEmpty) }
-                    Text("Sync uses committed files. Pulls only fast-forward; conflicts and diverged history require resolution in your Git client.").font(.caption).foregroundStyle(.secondary)
+                    Text("Sync uses committed files. Pulls only fast-forward; conflicts and diverged history require resolution in your Git client.").font(.subheadline).foregroundStyle(.secondary)
                 }.padding(12).disabled(busy)
             } else {
                 Spacer(minLength: 0)
@@ -93,11 +96,11 @@ struct GitInspector: View {
                     ForEach(state.remotes) { Text($0.name + " · " + $0.displayName).tag($0.name) }
                 }.disabled(busy)
             }
-            Label(state.branch.isEmpty ? "Detached HEAD" : state.branch + " → " + state.target, systemImage: "arrow.triangle.branch").font(.caption).textSelection(.enabled)
+            Label(state.branch.isEmpty ? "Detached HEAD" : state.branch + " → " + state.target, systemImage: "arrow.triangle.branch").font(.subheadline).textSelection(.enabled)
             HStack(spacing: 18) {
                 Label("\(state.behind) incoming", systemImage: "arrow.down")
                 Label("\(state.ahead) outgoing", systemImage: "arrow.up")
-            }.font(.caption.monospacedDigit())
+            }.font(.subheadline.monospacedDigit())
             Text(state.summary).foregroundStyle(state.conflicted || (state.ahead > 0 && state.behind > 0) ? Color.orange : Color.secondary)
             HStack {
                 Button("Synchronize", systemImage: "arrow.triangle.2.circlepath") { session.synchronizeGit(.synchronize) }.disabled(busy || !state.hasCommits || state.branch.isEmpty)
@@ -110,7 +113,7 @@ struct GitInspector: View {
                     Button("GitHub Authentication Settings…") { openSettings() }
                 } label: { Image(systemName: "ellipsis") }.menuStyle(.borderlessButton).frame(width: 24).disabled(busy)
             }
-            Text(session.gitLastFetched.map { "Fetched " + $0.formatted(date: .omitted, time: .shortened) } ?? "Cached status · Fetch to check the remote").font(.caption).foregroundStyle(.secondary)
+            Text(session.gitLastFetched.map { "Fetched " + $0.formatted(date: .omitted, time: .shortened) } ?? "Cached status · Fetch to check the remote").font(.subheadline).foregroundStyle(.secondary)
         } else {
             Label(state.branch.isEmpty ? "Local repository" : state.branch, systemImage: "arrow.triangle.branch")
             Text(state.summary).foregroundStyle(.secondary)
@@ -168,7 +171,7 @@ struct GitCommitSheet: View {
             Text("Review Commit").font(.title2.weight(.semibold))
             Toggle("Include all changed and untracked files", isOn: $stageAll)
             Text(stageAll ? "All files below will be staged and committed. Review untracked files and your .gitignore before including private material." : "Only the contents already staged in Git will be committed.").font(.callout).foregroundStyle(.secondary)
-            List(files) { file in HStack { Text(file.status).font(.system(.caption, design: .monospaced)); Text(file.path) } }.frame(height: 190)
+            List(files) { file in HStack { Text(file.status).font(.system(.subheadline, design: .monospaced)); Text(file.path) } }.frame(height: 190)
             TextField("Commit message", text: $message)
             HStack { TextField("Author name", text: $authorName); TextField("Author email", text: $authorEmail) }
             Text("The author identity is saved for this repository and included in commits. You can use your GitHub noreply email.").font(.caption).foregroundStyle(.secondary)

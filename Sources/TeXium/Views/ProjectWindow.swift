@@ -98,7 +98,7 @@ struct ProjectWindow: View {
                 Text(buffer.file.lineEnding == "\r\n" ? "CRLF" : "LF")
             }
             if session.isGitRepository { Label(session.gitBranch.isEmpty ? "Git" : session.gitBranch, systemImage: "arrow.triangle.branch") }
-        }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 14).frame(height: 28)
+        }.font(.subheadline).foregroundStyle(.secondary).padding(.horizontal, 14).frame(height: 28)
     }
     private var statusSymbol: (name: String, tint: AnyShapeStyle) {
         let status = session.buildStatus
@@ -149,7 +149,8 @@ struct ProjectNavigator: View {
                         Image(systemName: node.symbol).foregroundStyle(.secondary)
                         Text(node.name).lineLimit(1).truncationMode(.middle)
                         Spacer(minLength: 0)
-                        if node.path == session.configuration.mainFile { Image(systemName: "play.fill").font(.system(size: 8)).foregroundStyle(.secondary).help("Main document") }
+                        // A word, not a play glyph: a trailing triangle reads as a submenu arrow.
+                        if node.path == session.configuration.mainFile { Text("Main").font(.subheadline).foregroundStyle(.secondary).help("Main document, compiled with ⌘R") }
                         if session.buffers[node.path]?.dirty == true { Image(systemName: "circle.fill").font(.system(size: 5)).accessibilityLabel("Unsaved edits") }
                     }.tag(node.path)
                     .contextMenu { fileMenu(node) }
@@ -167,7 +168,7 @@ struct ProjectNavigator: View {
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                     .help("Add a file or folder").accessibilityLabel("Add")
                 Spacer()
-                Text(session.files.count.counted("file")).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                Text(session.files.count.counted("file")).font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
             }.padding(.horizontal, 12).padding(.vertical, 8)
         }
     }
