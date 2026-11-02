@@ -13,20 +13,41 @@ struct ProjectInspector: View {
             case "Outline": OutlineInspector(session: session)
             case "Problems": ProblemsInspector(session: session)
             case "Build Log":
-                VStack(spacing: 0) {
-                    NativeTextDisplay(text: session.buildLog.isEmpty ? "Compile the project to see the complete TeX log." : session.buildLog)
-                    Divider(); HStack { Button("Save Log…") { session.saveBuildLog() }; Spacer(); Text("⌘F to find").foregroundStyle(.secondary) }.font(.caption).padding(10)
+                if session.buildLog.isEmpty { InspectorEmptyState(title: "No Build Log Yet", symbol: "doc.plaintext", message: "Compile the project to see the complete TeX log here.") }
+                else { NativeTextDisplay(text: session.buildLog) }
+                InspectorBar(edge: .bottom) {
+                    Button("Save Log…") { session.saveBuildLog() }.disabled(session.buildLog.isEmpty)
+                    Spacer()
+                    if !session.buildLog.isEmpty { Text("⌘F to find").font(.subheadline).foregroundStyle(.secondary) }
                 }
             case "References": ReferencesInspector(session: session)
             case "History": HistoryInspector(session: session)
             case "Git": GitInspector(session: session)
             case "Notes": NotesInspector(session: session)
             default:
-                VStack(alignment: .leading) {
-                    Button("Count Document Words") { session.countWords() }.padding(12)
-                    NativeTextDisplay(text: session.wordReport.isEmpty ? "Uses texcount to distinguish prose, headings, captions, and mathematics across the main document’s included files." : session.wordReport)
+                if session.wordReport.isEmpty { InspectorEmptyState(title: "No Word Count Yet", symbol: "textformat.123", message: "Count words to separate prose, headings, captions, and mathematics across the main document and its included files.") }
+                else { NativeTextDisplay(text: session.wordReport) }
+                InspectorBar(edge: .bottom) {
+                    Button(session.wordReport.isEmpty ? "Count Words" : "Count Again") { session.countWords() }
+                    Spacer()
                 }
             }
+        }
+    }
+}
+
+/// A control row above or below inspector content. Every tab shares its inset,
+/// height, and divider so switching tabs never shifts the frame around the content.
+struct InspectorBar<Content: View>: View {
+    var edge: VerticalEdge = .top
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if edge == .bottom { Divider() }
+            HStack(spacing: 8) { content }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .frame(maxWidth: .infinity, minHeight: 40)
         }
     }
 }
@@ -89,11 +110,13 @@ struct ProblemsInspector: View {
     private var warningCount: Int { session.diagnostics.count - errorCount }
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Severity", selection: $filter) {
-                Text("All").tag("All")
-                Text(errorCount > 0 ? "Errors \(errorCount)" : "Errors").tag("Errors")
-                Text(warningCount > 0 ? "Warnings \(warningCount)" : "Warnings").tag("Warnings")
-            }.pickerStyle(.segmented).labelsHidden().padding(10)
+            InspectorBar {
+                Picker("Severity", selection: $filter) {
+                    Text("All").tag("All")
+                    Text(errorCount > 0 ? "Errors \(errorCount)" : "Errors").tag("Errors")
+                    Text(warningCount > 0 ? "Warnings \(warningCount)" : "Warnings").tag("Warnings")
+                }.pickerStyle(.segmented).labelsHidden()
+            }
             if session.diagnostics.isEmpty { InspectorEmptyState(title: "No Compilation Issues", symbol: "checkmark.circle", message: session.building ? "Typesetting is in progress." : "Diagnostics from your local compiler appear here.") }
             else if diagnostics.isEmpty { InspectorEmptyState(title: filter == "Errors" ? "No Errors" : "No Warnings", symbol: "checkmark.circle", message: filter == "Errors" ? "Only warnings remain from the last build." : "Only errors remain from the last build.") }
             else {
@@ -105,8 +128,8 @@ struct ProblemsInspector: View {
                                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                                         Image(systemName: diagnostic.severity.symbol).foregroundStyle(tint(diagnostic.severity))
                                         VStack(alignment: .leading, spacing: 4) {
-                                            Text(diagnostic.message).font(.callout).fixedSize(horizontal: false, vertical: true)
-                                            Text(diagnostic.severity.title + (diagnostic.line.map { " · Line \($0)" } ?? "")).font(.caption).foregroundStyle(.secondary)
+                                            Text(diagnostic.message).fixedSize(horizontal: false, vertical: true)
+                                            Text(diagnostic.severity.title + (diagnostic.line.map { " · Line \($0)" } ?? "")).font(.subheadline).foregroundStyle(.secondary)
                                         }
                                         Spacer(minLength: 0)
                                     }
@@ -145,16 +168,16 @@ struct ReferencesInspector: View {
     private func entry(for ids: Set<String>) -> BibEntry? { ids.first.flatMap { id in session.references.first { $0.id == id } } }
     var body: some View {
         VStack(spacing: 0) {
-            TextField("Search references", text: $query).textFieldStyle(.roundedBorder).padding(10)
+            InspectorBar { TextField("Search references", text: $query).textFieldStyle(.roundedBorder) }
             if session.references.isEmpty { InspectorEmptyState(title: "No References", symbol: "books.vertical", message: "Import a .bib file or paste BibTeX entries to get started.") }
             else if filtered.isEmpty { InspectorEmptyState(title: "No Matches", symbol: "magnifyingglass", message: "No references match “\(query)”.") }
             else {
                 List(selection: $selected) {
                     ForEach(filtered) { entry in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(entry.title.replacingOccurrences(of: "{", with: "").replacingOccurrences(of: "}", with: "")).font(.callout).lineLimit(3)
-                            Text([entry.author, entry.year].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                            Text(entry.key).font(.system(.caption, design: .monospaced)).foregroundStyle(.tertiary)
+                            Text(entry.title.replacingOccurrences(of: "{", with: "").replacingOccurrences(of: "}", with: "")).lineLimit(3)
+                            Text([entry.author, entry.year].filter { !$0.isEmpty }.joined(separator: " · ")).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                            Text(entry.key).font(.system(.subheadline, design: .monospaced)).foregroundStyle(.secondary)
                         }.padding(.vertical, 3).tag(entry.id)
                     }
                 }
@@ -171,12 +194,11 @@ struct ReferencesInspector: View {
                     if let entry = entry(for: ids) { session.insert("\\cite{\(entry.key)}") }
                 }
             }
-            Divider()
-            HStack {
-                Menu { Button("Import .bib File…") { session.importFiles() }; Button("Paste BibTeX…") { session.sheet = .pasteBib } } label: { Label("Add", systemImage: "plus") }
+            InspectorBar(edge: .bottom) {
+                Menu { Button("Import .bib File…") { session.importFiles() }; Button("Paste BibTeX…") { session.sheet = .pasteBib } } label: { Label("Add", systemImage: "plus") }.fixedSize()
                 Spacer()
                 Button("Insert Citation") { if let entry = session.references.first(where: { $0.id == selected }) { session.insert("\\cite{\(entry.key)}") } }.disabled(selected == nil || session.currentBuffer == nil)
-            }.padding(10).font(.caption)
+            }
         }
     }
 }
@@ -186,7 +208,6 @@ struct NotesInspector: View {
     private var visibleNotes: [UserNote] { session.notes.filter { showResolved || !$0.resolved } }
     var body: some View {
         VStack(spacing: 0) {
-            Toggle("Show resolved notes", isOn: $showResolved).font(.caption).padding(10)
             if visibleNotes.isEmpty {
                 InspectorEmptyState(title: "No Personal Notes", symbol: "note.text", message: "Add a note about this project to see it here.")
             } else {
@@ -194,19 +215,23 @@ struct NotesInspector: View {
                     ForEach(visibleNotes) { note in
                         VStack(alignment: .leading, spacing: 6) {
                             Text(note.text).textSelection(.enabled).strikethrough(note.resolved)
-                            if let file = note.file { Button("\(file):\(note.line ?? 1)") { Task { await session.select(file, line: note.line) } }.font(.caption).buttonStyle(.link) }
+                            if let file = note.file { Button("\(file):\(note.line ?? 1)") { Task { await session.select(file, line: note.line) } }.font(.subheadline).buttonStyle(.link) }
                             HStack {
-                                Text(note.created, style: .date).font(.caption).foregroundStyle(.secondary)
+                                Text(note.created, style: .date).font(.subheadline).foregroundStyle(.secondary)
                                 Spacer()
                                 Button(note.resolved ? "Reopen" : "Resolve") {
                                     if let index = session.notes.firstIndex(where: { $0.id == note.id }) { session.notes[index].resolved.toggle(); session.persistPreferences() }
-                                }.font(.caption)
+                                }.controlSize(.small)
                             }
                         }.padding(.vertical, 4)
                     }
                 }.listStyle(.inset)
             }
-            Button("Add Personal Note…", systemImage: "note.text.badge.plus") { session.sheet = .note }.padding(10)
+            InspectorBar(edge: .bottom) {
+                Button("Add Note…", systemImage: "plus") { session.sheet = .note }
+                Spacer()
+                Toggle("Show Resolved", isOn: $showResolved).toggleStyle(.checkbox)
+            }
         }
     }
 }
